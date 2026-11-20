@@ -1,0 +1,74 @@
+{
+  "name": "dustmap",
+  "productName": "Dustmap",
+  "version": "0.1.0",
+  "description": "Dustmap: a fast, beautiful disk space analyzer. See what fills your drive, find what's gathering dust and clean up safely.",
+  "private": true,
+  "author": "Dustmap contributors",
+  "license": "MIT",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/build.mjs && electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node scripts/build.mjs --engine-only && node dist-electron/cli.cjs --selftest",
+    "bench": "node scripts/build.mjs --engine-only && node dist-electron/cli.cjs",
+    "dist": "node scripts/build.mjs && electron-builder --win"
+  },
+  "build": {
+    "appId": "io.github.dustmap",
+    "productName": "Dustmap",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "!dist-electron/*.map",
+      "!dist-electron/cli.cjs",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "dist-electron/sc-walker.exe"
+    ],
+    "electronLanguages": [
+      "en-US",
+      "ru",
+      "zh-CN",
+      "es",
+      "es-419"
+    ],
+    "compression": "maximum",
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Dustmap-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Dustmap-${version}-portable.${ext}"
+    }
+  },
+  "devDependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
+    "lucide-react": "^1.77.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}

@@ -1,0 +1,42 @@
+name: Release
+
+# Push a tag such as v0.1.0 to build the Windows installer and portable exe
+# and attach them to a draft GitHub release. Review the draft, then publish it.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Engine self-test
+        run: npm test
+
+      - name: Build installer and portable exe
+        run: npm run dist -- --publish never
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: release/*.exe

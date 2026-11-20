@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          # electron-builder downloads its own copy of Electron when packaging.
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Engine self-test
+        run: npm test
+
+      - name: Build installer and portable exe
+        run: npm run dist -- --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dustmap-windows
+          path: release/*.exe
+          if-no-files-found: error
