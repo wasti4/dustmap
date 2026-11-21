@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+- Fixed the layout in small windows. The overview and explorer stack vertically, and the explorer hides columns as space runs out.
+- The title bar and tabs fit smaller windows, with a minimum window size of 760 × 540.
+- Fixed an NTFS timestamp rounding error that could shift file times by one second.
+
 ## 0.1.0
 
 First public release.

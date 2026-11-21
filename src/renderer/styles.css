@@ -445,6 +445,7 @@ kbd {
   color: var(--text);
 }
 .tb-root {
+  min-width: 0;
   color: var(--text-3);
   max-width: 260px;
   overflow: hidden;
@@ -456,6 +457,8 @@ kbd {
   align-items: center;
   gap: 8px;
   width: min(420px, 34vw);
+  min-width: 150px;
+  flex: 0 1 auto;
   height: 32px;
   margin-left: 8px;
   padding: 0 8px 0 11px;
@@ -712,14 +715,54 @@ button.drive-card:hover .low-space {
   min-height: 0;
   min-width: 0;
 }
+/* Narrow windows: one column that scrolls as a page. The overview keeps its
+   natural height (min-height: auto stops it collapsing under the explorer),
+   and the explorer below fills one screen so it is fully usable once scrolled to. */
 @media (max-width: 1180px) {
   .workspace {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(560px, 1fr);
+    grid-template-rows: auto max(400px, calc(100vh - 80px));
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .col-left {
     overflow: visible;
+    min-height: auto;
+  }
+}
+@media (max-width: 900px) {
+  .workspace {
+    padding: 12px;
+    gap: 12px;
+  }
+  .brand > span,
+  .tb-label,
+  .tb-search kbd {
+    display: none;
+  }
+}
+
+/* The explorer table drops its least important columns when it gets narrow. */
+.explorer {
+  container-type: inline-size;
+}
+@container (max-width: 620px) {
+  .explorer .table {
+    --cols: minmax(0, 1fr) 88px 96px 116px;
+  }
+  .explorer .table .c-files {
+    display: none;
+  }
+  .explorer .table .c-share .num {
+    display: none;
+  }
+}
+@container (max-width: 470px) {
+  .explorer .table {
+    --cols: minmax(0, 1fr) 88px 96px;
+  }
+  .explorer .table .c-last {
+    display: none;
   }
 }
 
@@ -944,6 +987,7 @@ button.drive-card:hover .low-space {
   align-items: center;
   gap: 4px;
   flex: none;
+  min-width: 0;
 }
 .tab {
   height: 34px;
@@ -963,7 +1007,15 @@ button.drive-card:hover .low-space {
   border-color: var(--line);
   color: var(--text);
 }
+.tab {
+  flex: none;
+  white-space: nowrap;
+}
 .tab-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin-left: auto;
   color: var(--text-3);
 }

@@ -414,8 +414,8 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1400,
     height: 900,
-    minWidth: 1040,
-    minHeight: 680,
+    minWidth: 760,
+    minHeight: 540,
     show: false,
     backgroundColor: chrome.color,
     title: 'Dustmap',
@@ -446,11 +446,17 @@ function createWindow() {
   if (devUrl) win.loadURL(devUrl + (Object.keys(query).length ? '?' + new URLSearchParams(query) : ''));
   else win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { query });
 
-  // Test hook: --capture=<png> [--capture-delay=ms] saves a screenshot and quits.
+  // Test hook: --capture=<png> [--capture-delay=ms] [--size=WxH] saves a screenshot and quits.
   if (capturePath) {
+    const size = /^(\d+)x(\d+)$/.exec(argValue('size') ?? '');
+    if (size) win.setContentSize(Number(size[1]), Number(size[2]));
     const delay = Number(argValue('capture-delay') ?? 6000);
     win.webContents.once('did-finish-load', () => {
       setTimeout(async () => {
+        if (argv.includes('--capture-scroll')) {
+          await win!.webContents.executeJavaScript("document.querySelector('.workspace')?.scrollTo(0, 1e6)");
+          await new Promise((r) => setTimeout(r, 400));
+        }
         const img = await win!.webContents.capturePage();
         fs.writeFileSync(capturePath, img.toPNG());
         app.quit();

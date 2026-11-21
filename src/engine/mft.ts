@@ -29,9 +29,18 @@ const CHUNK = 8 * 1024 * 1024;
 const u64 = (b: Buffer, o: number) => b.readUInt32LE(o) + b.readUInt32LE(o + 4) * 4294967296;
 const u48 = (b: Buffer, o: number) => b.readUInt32LE(o) + b.readUInt16LE(o + 4) * 4294967296;
 
+/**
+ * FILETIME (100 ns ticks since 1601, as hi:lo u32) to whole Unix seconds.
+ * hi * 2^32 = hi * (429 * 1e7 + 4967296), so the division stays in exact
+ * integers; a plain float sum can land on x.9999999 and lose a second.
+ */
+function filetimeSec(hi: number, lo: number): number {
+  const s = hi * 429 + Math.floor((hi * 4967296 + lo) / 1e7) - EPOCH_DIFF;
+  return s > 0 && s < 4294967295 ? s : 0;
+}
+
 function ftToSec(b: Buffer, o: number): number {
-  const s = b.readUInt32LE(o + 4) * 429.4967296 + b.readUInt32LE(o) / 1e7 - EPOCH_DIFF;
-  return s > 0 && s < 4294967295 ? Math.floor(s) : 0;
+  return filetimeSec(b.readUInt32LE(o + 4), b.readUInt32LE(o));
 }
 
 /** Applies the update-sequence fixups of a multi-sector record. */
@@ -246,10 +255,7 @@ export async function readMft(
 const r16 = (b: Uint8Array, o: number) => b[o] | (b[o + 1] << 8);
 const r32 = (b: Uint8Array, o: number) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
 const r64 = (b: Uint8Array, o: number) => r32(b, o) + r32(b, o + 4) * 4294967296;
-const rft = (b: Uint8Array, o: number) => {
-  const s = r32(b, o + 4) * 429.4967296 + r32(b, o) / 1e7 - EPOCH_DIFF;
-  return s > 0 && s < 4294967295 ? Math.floor(s) : 0;
-};
+const rft = (b: Uint8Array, o: number) => filetimeSec(r32(b, o + 4), r32(b, o));
 
 /**
  * Parses FILE records into a Tree whose node ids are MFT record numbers.

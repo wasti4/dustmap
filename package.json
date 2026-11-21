@@ -1,7 +1,7 @@
 {
   "name": "dustmap",
   "productName": "Dustmap",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Dustmap: a fast, beautiful disk space analyzer. See what fills your drive, find what's gathering dust and clean up safely.",
   "private": true,
   "author": "Dustmap contributors",

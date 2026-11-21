@@ -86,9 +86,9 @@ function TitleBar() {
       </div>
       {view === 'workspace' && (
         <>
-          <button type="button" className="tb-btn" onClick={goHome}>
+          <button type="button" className="tb-btn" aria-label={t('app.home')} onClick={goHome}>
             <House size={15} aria-hidden />
-            {t('app.home')}
+            <span className="tb-label">{t('app.home')}</span>
           </button>
           {root && <span className="tb-root mono">{root}</span>}
           <label className={`tb-search${summary ? '' : ' is-disabled'}`}>
