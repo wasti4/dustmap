@@ -16,6 +16,10 @@
   <a href="CHANGELOG.md">Изменения</a>
 </p>
 
+## Видеообзор
+
+https://github.com/user-attachments/assets/5e02b4ce-4295-4048-a572-48f1ad7a6413
+
 ![Dustmap в тёмной теме](docs/screenshots/overview-dark.png)
 
 ## Возможности

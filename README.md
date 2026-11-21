@@ -16,6 +16,10 @@
   <a href="CHANGELOG.md">Changelog</a>
 </p>
 
+## Showcase
+
+https://github.com/user-attachments/assets/5e02b4ce-4295-4048-a572-48f1ad7a6413
+
 ![Dustmap overview in the dark theme](docs/screenshots/overview-dark.png)
 
 ## Features
