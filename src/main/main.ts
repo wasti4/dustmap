@@ -6,11 +6,22 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import type { DriveInfo, OpResult, StartupInfo } from '../shared/types';
+import { REDACT_USER } from '../shared/redact';
 
 const argv = process.argv.slice(1);
 const argValue = (name: string) => argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const devUrl = process.env.VITE_DEV_SERVER_URL || argValue('dev-server');
 const capturePath = argValue('capture');
+// Dev-only video hook: --record=<dir> renders the window offscreen at 2x and hands it to
+// scripts/video/recorder.cjs, which drives the UI and saves frames. Ignored in packaged builds.
+const recordDir = app.isPackaged ? undefined : argValue('record');
+const RECORD_SIZE = { width: 1440, height: 810 };
+if (recordDir) {
+  // A fresh profile per take, so prefs saved by an earlier take never leak into this one.
+  const profile = path.resolve(recordDir, 'profile');
+  fs.rmSync(profile, { recursive: true, force: true });
+  app.setPath('userData', profile);
+}
 let win: BrowserWindow | null = null;
 
 app.setAppUserModelId('io.github.dustmap');
@@ -28,7 +39,7 @@ class Engine {
   private start() {
     const proc = utilityProcess.fork(path.join(__dirname, 'engine.cjs'), [], {
       serviceName: 'Dustmap Engine',
-      env: { ...process.env, UV_THREADPOOL_SIZE: '16' },
+      env: { ...process.env, UV_THREADPOOL_SIZE: '16', ...(recordDir ? { DUSTMAP_REDACT: '1' } : {}) },
       execArgv: ['--expose-gc'],
       stdio: 'inherit',
     });
@@ -280,7 +291,7 @@ function relaunchElevated(resumeRoot?: string): Promise<boolean> {
 function registerIpc() {
   ipcMain.handle('startup', (): StartupInfo => {
     const scan = argValue('scan');
-    return { elevated: isElevated(), autoScan: scan, systemDrive, home: os.homedir(), version: app.getVersion() };
+    return { elevated: isElevated(), autoScan: scan, systemDrive, home: recordDir ? path.join(path.dirname(os.homedir()), REDACT_USER) : os.homedir(), version: app.getVersion() };
   });
   ipcMain.handle('drives', async (_e, refresh?: boolean) => {
     if (!drivesCache || refresh) drivesCache = listDrives();
@@ -412,8 +423,9 @@ function saveChrome(o: { color: string; symbol: string }) {
 function createWindow() {
   const chrome = loadChrome();
   win = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: recordDir ? RECORD_SIZE.width : 1400,
+    height: recordDir ? RECORD_SIZE.height : 900,
+    useContentSize: !!recordDir,
     minWidth: 760,
     minHeight: 540,
     show: false,
@@ -429,9 +441,10 @@ function createWindow() {
       sandbox: true,
       nodeIntegration: false,
       spellcheck: false,
+      ...(recordDir ? { offscreen: { deviceScaleFactor: 2 }, backgroundThrottling: false } : {}),
     },
   });
-  win.once('ready-to-show', () => win?.show());
+  if (!recordDir) win.once('ready-to-show', () => win?.show());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e, url) => {
     if (!devUrl || !url.startsWith(devUrl)) e.preventDefault();
@@ -466,6 +479,11 @@ function createWindow() {
   win.on('closed', () => {
     win = null;
   });
+  if (recordDir) {
+    // Loaded at runtime from the project so the recorder never ships in the bundle.
+    const recorder = require(path.join(app.getAppPath(), 'scripts', 'video', 'recorder.cjs'));
+    recorder.start({ win, app, outDir: path.resolve(recordDir), size: RECORD_SIZE, argv });
+  }
 }
 
 app.whenReady().then(() => {

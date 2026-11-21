@@ -33,6 +33,15 @@ Never try cleanup or deletion flows on your real files. Use the demo drive inste
 
 Turbo mode reads the raw volume and needs administrator rights. Check it from an administrator terminal with `npm run bench -- C:\ --mft`. `npm test` covers the MFT parser without admin rights.
 
+## Recording the demo video
+
+The README video is rendered from the real app rather than captured from the screen, so it stays sharp when the camera zooms in. You need `ffmpeg` on `PATH`.
+
+1. `npm run video:record` builds the app, opens it offscreen at 2x and plays `scripts/video/scenario.cjs` with real mouse and keyboard input. Frames go to `video-out/take`. The take scans your real drive C:, so your folder and file names appear in it. Run it from an administrator terminal to show turbo mode.
+2. `npm run video:compose` adds the backdrop, the cursor, the camera moves and the scan stopwatch, and writes `video-out/dustmap-demo.mp4`.
+
+The scenario sets camera cues (`overview`, `follow`, `focus`), and critically damped springs move the camera toward them, so it trails the cursor and eases to a stop. To put the video in the README, drag the MP4 into the README editor on GitHub: a README only plays videos from GitHub attachment links.
+
 ## Adding a language
 
 1. Copy `src/renderer/lib/locales/es.ts` to a new file, for example `de.ts`, and translate every string. TypeScript reports missing keys.

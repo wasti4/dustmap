@@ -14,7 +14,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node scripts/build.mjs --engine-only && node dist-electron/cli.cjs --selftest",
     "bench": "node scripts/build.mjs --engine-only && node dist-electron/cli.cjs",
-    "dist": "node scripts/build.mjs && electron-builder --win"
+    "dist": "node scripts/build.mjs && electron-builder --win",
+    "video:record": "node scripts/build.mjs && electron . --record=video-out/take --theme=dark --lang=en",
+    "video:compose": "electron scripts/video/compose.cjs --in=video-out/take --out=video-out/dustmap-demo.mp4"
   },
   "build": {
     "appId": "io.github.dustmap",

@@ -5,6 +5,45 @@ import { execFile } from 'node:child_process';
 import type { InsightKind, ScanRequest, ScanSummary } from '../shared/types';
 import { runScan, volumeSpace, walkSubtree, type ScanState } from './scanner';
 import * as Q from './query';
+import os from 'node:os';
+import path from 'node:path';
+import type { Tree } from './tree';
+import { maskName, redactPath } from '../shared/redact';
+
+// Demo-video recordings (dev only) mask personal names; see src/shared/redact.ts.
+const REDACT = process.env.DUSTMAP_REDACT === '1';
+const USER = path.basename(os.homedir()).toLowerCase();
+
+/** Renames personal nodes in place, after classification has used the real names. */
+function redactTree(tree: Tree) {
+  const depth = new Int32Array(tree.n).fill(-1);
+  const top = new Int32Array(tree.n).fill(-1);
+  depth[tree.root] = 0;
+  const stack: number[] = [];
+  for (let id = 0; id < tree.n; id++) {
+    if (!tree.alive(id) || depth[id] >= 0) continue;
+    let p = id;
+    while (p >= 0 && depth[p] < 0) {
+      stack.push(p);
+      p = tree.parent[p];
+    }
+    if (p < 0) {
+      stack.length = 0;
+      continue;
+    }
+    while (stack.length) {
+      const c = stack.pop()!;
+      depth[c] = depth[p] + 1;
+      top[c] = depth[c] === 1 ? c : top[p];
+      p = c;
+    }
+  }
+  const names = tree.names.slice();
+  for (let id = 0; id < tree.n; id++) {
+    if (depth[id] <= 0 || names[id] == null) continue;
+    tree.names[id] = maskName(names[id], depth[id], (names[top[id]] ?? '').toLowerCase(), USER);
+  }
+}
 
 interface Port {
   on(ev: 'message', cb: (e: { data: { id: number; method: string; params: unknown } }) => void): void;
@@ -74,9 +113,10 @@ const handlers: Record<string, (p: never) => unknown> = {
     if (ctl) ctl.cancelled = true;
     const c = { cancelled: false };
     ctl = c;
-    runScan(id, p, (data) => post({ type: 'progress', data }), c)
+    runScan(id, p, (data) => post({ type: 'progress', data: REDACT ? { ...data, path: redactPath(data.path, USER) } : data }), c)
       .then((st) => {
         if (c.cancelled) return;
+        if (REDACT) redactTree(st.tree);
         // Give memory back: trim array capacity, drop the previous scan, collect garbage.
         st.tree.compact();
         scan = null;
