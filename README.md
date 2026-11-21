@@ -5,22 +5,43 @@
 <h1 align="center">Dustmap</h1>
 
 <p align="center">
-  See what fills your disk, find what’s gathering dust, and clean up safely.<br>
+  <b>See what fills your disk, find what’s gathering dust, and clean up safely.</b><br>
   A fast, open-source disk space analyzer for Windows.
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><b>Download</b></a> ·
+  <a href="https://github.com/wasti4/dustmap/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/wasti4/dustmap?style=flat-square&color=5b6cff"></a>
+  <a href="https://github.com/wasti4/dustmap/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/wasti4/dustmap/total?style=flat-square&color=22c55e"></a>
+  <a href="https://github.com/wasti4/dustmap/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/wasti4/dustmap/ci.yml?branch=main&style=flat-square&label=build"></a>
+  <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/wasti4/dustmap?style=flat-square&color=8b8b97"></a>
+</p>
+
+<p align="center">
+  <a href="../../releases/latest"><b>Download for Windows</b></a> ·
   <a href="README.ru.md">Русский</a> ·
   <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="CHANGELOG.md">Changelog</a>
 </p>
 
-## Showcase
+https://github.com/user-attachments/assets/4b7f5ba1-2586-428c-8a0b-e1f1628578ff
 
-https://github.com/user-attachments/assets/5e02b4ce-4295-4048-a572-48f1ad7a6413
+<p align="center"><sub>A real, unedited scan of a system drive with 877 thousand files, without administrator rights. Personal folder names are masked.</sub></p>
 
-![Dustmap overview in the dark theme](docs/screenshots/overview-dark.png)
+## Why Dustmap
+
+- **A whole drive in seconds.** About 7 seconds for a system drive with no admin rights, 3.4 seconds in turbo mode.
+- **Finds what you forgot.** Large files and whole folders nobody has opened for months, sorted by size.
+- **Cleans up safely.** Everything goes to the Recycle Bin, Windows folders are protected, and you see the total before you confirm.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/overview-dark.png" alt="Dustmap overview in the dark theme"></td>
+    <td><img src="docs/screenshots/overview-light.png" alt="Dustmap overview in the light theme"></td>
+  </tr>
+</table>
 
 ## Features
 
@@ -37,7 +58,6 @@ https://github.com/user-attachments/assets/5e02b4ce-4295-4048-a572-48f1ad7a6413
 - **Accessible.** Full keyboard control, ARIA roles, screen reader announcements and a reduced-motion mode.
 - **Private.** Works offline. No accounts, no telemetry.
 
-![Dustmap overview in the light theme](docs/screenshots/overview-light.png)
 
 ## Download
 

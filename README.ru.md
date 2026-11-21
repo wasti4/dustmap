@@ -5,22 +5,43 @@
 <h1 align="center">Dustmap</h1>
 
 <p align="center">
-  Посмотрите, что заполняет диск, найдите то, что пылится без дела, и безопасно освободите место.<br>
+  <b>Посмотрите, что заполняет диск, найдите то, что пылится без дела, и безопасно освободите место.</b><br>
   Быстрый анализатор дискового пространства для Windows с открытым исходным кодом.
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><b>Скачать</b></a> ·
+  <a href="https://github.com/wasti4/dustmap/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/wasti4/dustmap?style=flat-square&color=5b6cff"></a>
+  <a href="https://github.com/wasti4/dustmap/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/wasti4/dustmap/total?style=flat-square&color=22c55e"></a>
+  <a href="https://github.com/wasti4/dustmap/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/wasti4/dustmap/ci.yml?branch=main&style=flat-square&label=build"></a>
+  <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/wasti4/dustmap?style=flat-square&color=8b8b97"></a>
+</p>
+
+<p align="center">
+  <a href="../../releases/latest"><b>Скачать для Windows</b></a> ·
   <a href="README.md">English</a> ·
   <a href="CONTRIBUTING.md">Как помочь проекту</a> ·
   <a href="CHANGELOG.md">Изменения</a>
 </p>
 
-## Видеообзор
+https://github.com/user-attachments/assets/4b7f5ba1-2586-428c-8a0b-e1f1628578ff
 
-https://github.com/user-attachments/assets/5e02b4ce-4295-4048-a572-48f1ad7a6413
+<p align="center"><sub>Настоящий скан системного диска с 877 тысячами файлов без прав администратора, без монтажа. Названия личных папок скрыты.</sub></p>
 
-![Dustmap в тёмной теме](docs/screenshots/overview-dark.png)
+## Почему Dustmap
+
+- **Весь диск за секунды.** Около 7 секунд на системный диск без прав администратора, 3,4 секунды в турбо-режиме.
+- **Находит забытое.** Большие файлы и целые папки, которые месяцами никто не открывал, отсортированные по размеру.
+- **Убирает безопасно.** Всё уходит в Корзину, папки Windows защищены, а итоговый размер видно до подтверждения.
+
+## Скриншоты
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/overview-dark.png" alt="Dustmap в тёмной теме"></td>
+    <td><img src="docs/screenshots/overview-light.png" alt="Dustmap в светлой теме"></td>
+  </tr>
+</table>
 
 ## Возможности
 
