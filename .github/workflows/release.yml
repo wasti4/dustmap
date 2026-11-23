@@ -52,9 +52,12 @@ jobs:
             echo "::warning::The draft macOS installer is ad-hoc signed. Configure Developer ID and notarization before public distribution."
             npm run dist -- --publish never -c.mac.identity=-
           elif [[ -n "$CSC_LINK" && -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
-            npm run dist -- --publish never -c.forceCodeSigning=true -c.mac.notarize=true
-            app=$(find release -type d -name Dustmap.app -print -quit)
-            xcrun stapler validate "$app"
+            npm run dist -- --publish never -c.forceCodeSigning=true -c.mac.notarize=true -c.dmg.sign=true
+            for image in release/*.dmg; do
+              xcrun notarytool submit "$image" --wait --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID"
+              xcrun stapler staple "$image"
+              xcrun stapler validate "$image"
+            done
           else
             echo "::error::Configure both Developer ID signing and Apple notarization credentials."
             exit 1

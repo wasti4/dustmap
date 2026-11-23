@@ -49,10 +49,10 @@ jobs:
         if: matrix.artifact == 'dustmap-macos-arm64'
         shell: bash
         run: |
-          image="$RUNNER_TEMP/dustmap-fixture.dmg"
+          image="$RUNNER_TEMP/dustmap-fixture.sparseimage"
           volume="/Volumes/Dustmap Fixture"
-          hdiutil create -quiet -size 96m -fs APFSX -volname 'Dustmap Fixture' "$image"
-          hdiutil attach -quiet -owners on -nobrowse "$image"
+          hdiutil create -type SPARSE -size 128m -fs 'Case-sensitive APFS' -uid "$(id -u)" -gid "$(id -g)" -volname 'Dustmap Fixture' "$image"
+          hdiutil attach -owners on -nobrowse "$image"
           trap 'hdiutil detach "$volume"' EXIT
           DUSTMAP_TEST_STARTUP=1 DUSTMAP_TEST_VOLUME="$volume" node dist-electron/cli.cjs --selftest
 
