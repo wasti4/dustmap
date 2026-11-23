@@ -56,7 +56,7 @@ let ctl: { cancelled: boolean } | null = null;
 let seq = 0;
 let accessTracking: ScanSummary['accessTracking'] = 'unknown';
 
-execFile(
+if (process.platform === 'win32') execFile(
   'reg',
   ['query', 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem', '/v', 'NtfsDisableLastAccessUpdate'],
   { windowsHide: true, timeout: 5000 },

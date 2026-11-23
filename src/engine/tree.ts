@@ -37,7 +37,7 @@ export class Tree {
   aLast = new Uint32Array(0);
   names: string[] = [];
 
-  constructor(capacity = 1 << 16) {
+  constructor(capacity = 1 << 16, private readonly separator = '\\') {
     this.resize(capacity);
   }
 
@@ -114,7 +114,7 @@ export class Tree {
     parts.reverse();
     let out = parts[0] ?? '';
     for (let i = 1; i < parts.length; i++) {
-      out += out.endsWith('\\') || out.endsWith('/') ? parts[i] : '\\' + parts[i];
+      out += (out.endsWith(this.separator) ? '' : this.separator) + parts[i];
     }
     return out;
   }

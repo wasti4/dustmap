@@ -1,6 +1,5 @@
 // Scan orchestration: picks the turbo MFT reader when possible, falls back to
 // the portable walker, classifies everything and aggregates the tree.
-import fs from 'node:fs';
 import path from 'node:path';
 import { CAT_COUNT, Cat, type Insight, type ScanMode, type ScanProgress, type ScanRequest } from '../shared/types';
 import { Tree, F_DIR } from './tree';
@@ -8,6 +7,10 @@ import { walkInto, type WalkStats } from './walk';
 import { fastWalk, helperPath } from './fastwalk';
 import { readMft, MftUnavailable } from './mft';
 import { contextForPath, dirContext, fileCategory } from './classify';
+import { isMac, macHelperPath, macScanScope, volumeSpace, type MacScanScope } from '../platform/macos';
+import { walkMacNative, walkMacPortable } from './macwalk';
+
+export { volumeSpace };
 
 export interface ScanState {
   id: number;
@@ -16,6 +19,8 @@ export interface ScanState {
   rootId: number;
   baseDepth: number;
   isVolume: boolean;
+  mac?: MacScanScope;
+  macBulkEntries?: number;
   mode: ScanMode;
   turboNote?: 'not-admin' | 'not-ntfs' | 'failed' | 'not-volume';
   /** Diagnostic message when the MFT reader failed. */
@@ -39,15 +44,6 @@ export function normalizeRoot(p: string): string {
   if (/^[A-Za-z]:$/.test(r)) r += '\\';
   if (/^[a-z]:\\/.test(r)) r = r[0].toUpperCase() + r.slice(1);
   return r;
-}
-
-export async function volumeSpace(root: string): Promise<{ total: number; free: number }> {
-  try {
-    const s = await fs.promises.statfs(root);
-    return { total: s.blocks * s.bsize, free: s.bavail * s.bsize };
-  } catch {
-    return { total: 0, free: 0 };
-  }
 }
 
 export function newWalkStats(): WalkStats {
@@ -81,18 +77,19 @@ export function classifyTree(tree: Tree, rootId: number, rootCtx: number, baseDe
 
 export async function runScan(id: number, req: ScanRequest, onProgress: (p: ScanProgress) => void, ctl: ScanControl): Promise<ScanState> {
   const t0 = Date.now();
-  const root = normalizeRoot(req.root);
-  const isVolume = /^[A-Z]:\\$/.test(root);
+  const mac = isMac ? await macScanScope(req.root) : undefined;
+  const root = mac?.root ?? normalizeRoot(req.root);
+  const isVolume = mac ? root === mac.volume : /^[A-Z]:\\$/.test(root);
   const { total, free } = await volumeSpace(root);
-  const { ctx: rootCtx, depth: baseDepth } = contextForPath(root);
+  const { ctx: rootCtx, depth: baseDepth } = contextForPath(root, mac ? 'darwin' : 'win32', mac?.volume);
   const used = Math.max(1, total - free);
   let turboNote: ScanState['turboNote'];
   let turboError: string | undefined;
 
   const emit = (p: Omit<ScanProgress, 'scanId' | 'total' | 'free'>) => onProgress({ ...p, scanId: id, total, free });
 
-  if (req.turbo && !isVolume) turboNote = 'not-volume';
-  if (req.turbo && isVolume) {
+  if (!mac && req.turbo && !isVolume) turboNote = 'not-volume';
+  if (!mac && req.turbo && isVolume) {
     const tree = new Tree(16);
     let last = 0;
     try {
@@ -158,7 +155,7 @@ export async function runScan(id: number, req: ScanRequest, onProgress: (p: Scan
   }, 100);
   let tree: Tree;
   try {
-    tree = await walkTree(root, rootCtx, baseDepth, stats);
+    tree = await walkTree(root, rootCtx, baseDepth, stats, mac);
   } finally {
     clearInterval(timer);
   }
@@ -173,6 +170,8 @@ export async function runScan(id: number, req: ScanRequest, onProgress: (p: Scan
     baseDepth,
     isVolume,
     mode: 'walk',
+    mac,
+    macBulkEntries: stats.bulkEntries,
     turboNote,
     turboError,
     ms: Date.now() - t0,
@@ -185,14 +184,25 @@ export async function runScan(id: number, req: ScanRequest, onProgress: (p: Scan
 }
 
 function freshTree(root: string, rootCtx: number): Tree {
-  const tree = new Tree(1 << 18);
+  const tree = new Tree(1 << 18, path.sep);
   const rootId = tree.add(-1, root, F_DIR);
   tree.root = rootId;
   tree.ctx[rootId] = rootCtx;
   return tree;
 }
 
-async function walkTree(root: string, rootCtx: number, baseDepth: number, stats: WalkStats): Promise<Tree> {
+async function walkTree(root: string, rootCtx: number, baseDepth: number, stats: WalkStats, mac?: MacScanScope): Promise<Tree> {
+  if (mac) {
+    const helper = macHelperPath();
+    if (helper) {
+      const tree = freshTree(root, rootCtx);
+      if (await walkMacNative(tree, tree.root, baseDepth, mac, stats, helper) || stats.cancelled) return tree;
+      Object.assign(stats, newWalkStats(), { bulkEntries: undefined });
+    }
+    const tree = freshTree(root, rootCtx);
+    await walkMacPortable(tree, tree.root, baseDepth, mac, stats);
+    return tree;
+  }
   const exe = helperPath();
   if (exe) {
     const tree = freshTree(root, rootCtx);
@@ -208,6 +218,10 @@ async function walkTree(root: string, rootCtx: number, baseDepth: number, stats:
 /** Re-walks the children of an existing directory node (used after cleanups). */
 export async function walkSubtree(tree: Tree, id: number, dirPath: string, depth: number): Promise<void> {
   const stats = newWalkStats();
+  if (isMac) {
+    await walkMacPortable(tree, id, depth, await macScanScope(dirPath), stats);
+    return;
+  }
   const exe = helperPath();
   if (exe) {
     const before = tree.n;

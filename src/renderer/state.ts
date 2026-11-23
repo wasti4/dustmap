@@ -139,7 +139,7 @@ export function useStore<T>(sel: (s: State) => T): T {
   return useSyncExternalStore(subscribe, () => sel(state));
 }
 
-export const t = (key: TKey, vars?: Record<string, string | number>) => translate(state.lang, key, vars);
+export const t = (key: TKey, vars?: Record<string, string | number>) => translate(state.lang, key, vars, state.startup?.platform === 'darwin');
 const bytes = (n: number) => fmtBytes(n, state.lang);
 
 // ------------------------------------------------------------------ theme
@@ -195,7 +195,7 @@ export async function init() {
 }
 
 export async function refreshDrives() {
-  setState({ drives: await api.drives() });
+  setState({ drives: await api.drives(true) });
 }
 
 export function startScan(root: string) {
@@ -285,6 +285,13 @@ function applySummary(next: ScanSummary) {
 }
 
 async function afterOp(res: OpResult, items: { id: number; path: string }[], refreshAll = false) {
+  if (state.startup?.platform === 'darwin') {
+    // Reindex allocation after a move or delete so remaining hard links inherit their blocks.
+    // A move to Trash and APFS snapshots can leave the actual available space unchanged.
+    if (res.failed.length) toast(t('toast.skipped', { count: res.failed.length }), 'info');
+    if (state.summary && (res.ok.length || res.failed.length)) startScan(state.summary.root);
+    return;
+  }
   const ok = new Set(res.ok);
   const removedIds = refreshAll ? [] : items.filter((i) => ok.has(i.path)).map((i) => i.id);
   const refreshIds = refreshAll ? items.map((i) => i.id) : items.filter((i) => !ok.has(i.path)).map((i) => i.id);
@@ -316,7 +323,8 @@ export async function removeItems(items: NodeInfo[], mode: 'trash' | 'permanent'
 }
 
 export async function runInsight(ins: Insight, items: NodeInfo[], mode: DeleteMode) {
-  const root = state.summary?.root ?? 'C:\\';
+  const root = state.summary?.root;
+  if (!root) return;
   if (ins.action === 'diskCleanup') {
     await api.diskCleanup(root);
     setState({ dialog: null });

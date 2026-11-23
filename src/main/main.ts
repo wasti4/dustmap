@@ -7,6 +7,8 @@ import path from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import type { DriveInfo, OpResult, StartupInfo } from '../shared/types';
 import { REDACT_USER } from '../shared/redact';
+import { isMac, macDrives, macScanScope, volumeSpace } from '../platform/macos';
+import { emptyMacTrash, macMutationTarget, removeMacPath } from '../platform/mac-cleanup';
 
 const argv = process.argv.slice(1);
 const argValue = (name: string) => argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -24,7 +26,7 @@ if (recordDir) {
 }
 let win: BrowserWindow | null = null;
 
-app.setAppUserModelId('io.github.dustmap');
+if (process.platform === 'win32') app.setAppUserModelId('io.github.dustmap');
 // The UI is plain 2D (DOM + canvas). Skipping GPU acceleration saves ~300 MB of
 // committed memory and a busy GPU process, at no visible cost.
 app.disableHardwareAcceleration();
@@ -82,9 +84,10 @@ const engine = new Engine();
 
 // ------------------------------------------------------------------ helpers
 
-const systemDrive = (process.env.SystemDrive || 'C:').toUpperCase();
+const systemDrive = isMac ? '/' : (process.env.SystemDrive || 'C:').toUpperCase();
 
 function isElevated(): boolean {
+  if (isMac) return false;
   try {
     fs.closeSync(fs.openSync('\\\\.\\' + systemDrive, 'r'));
     return true;
@@ -267,6 +270,7 @@ async function removeBestEffort(p: string): Promise<boolean> {
 }
 
 function relaunchElevated(resumeRoot?: string): Promise<boolean> {
+  if (isMac) return Promise.resolve(false);
   const quoteArg = (a: string) => '"' + a.replace(/(\\+)$/, '$1$1') + '"';
   const args: string[] = [];
   if (!app.isPackaged) args.push(app.getAppPath());
@@ -286,18 +290,35 @@ function relaunchElevated(resumeRoot?: string): Promise<boolean> {
   );
 }
 
+async function macOperations(paths: string[], run: (p: string) => Promise<void>): Promise<OpResult> {
+  const res: OpResult = { ok: [], failed: [] };
+  for (const p of paths) {
+    try {
+      await run(p);
+      res.ok.push(p);
+    } catch (e) {
+      res.failed.push({ path: p, error: String((e as Error).message ?? e) });
+    }
+  }
+  return res;
+}
+
 // ------------------------------------------------------------------ IPC
 
 function registerIpc() {
   ipcMain.handle('startup', (): StartupInfo => {
     const scan = argValue('scan');
-    return { elevated: isElevated(), autoScan: scan, systemDrive, home: recordDir ? path.join(path.dirname(os.homedir()), REDACT_USER) : os.homedir(), version: app.getVersion() };
+    return { platform: isMac ? 'darwin' : 'win32', elevated: isElevated(), autoScan: scan, systemDrive, home: recordDir ? path.join(path.dirname(os.homedir()), REDACT_USER) : os.homedir(), version: app.getVersion() };
   });
   ipcMain.handle('drives', async (_e, refresh?: boolean) => {
+    if (isMac) return macDrives();
     if (!drivesCache || refresh) drivesCache = listDrives();
     return drivesCache;
   });
   ipcMain.handle('relaunchElevated', (_e, root?: string) => relaunchElevated(root));
+  ipcMain.handle('openDiskAccessSettings', async () => {
+    if (isMac) await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles');
+  });
   ipcMain.handle('chooseFolder', async () => {
     const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory'] });
     return r.canceled ? null : r.filePaths[0];
@@ -313,16 +334,13 @@ function registerIpc() {
   ipcMain.handle('openPath', (_e, p: string) => shell.openPath(p));
   ipcMain.handle('reveal', (_e, p: string) => shell.showItemInFolder(p));
   ipcMain.handle('copyText', (_e, t: string) => clipboard.writeText(t));
-  ipcMain.handle('space', async (_e, root: string) => {
-    try {
-      const s = await fs.promises.statfs(root);
-      return { total: s.blocks * s.bsize, free: s.bavail * s.bsize };
-    } catch {
-      return { total: 0, free: 0 };
-    }
-  });
+  ipcMain.handle('space', (_e, root: string) => volumeSpace(root));
 
   ipcMain.handle('trash', async (_e, paths: string[]): Promise<OpResult> => {
+    if (isMac) return macOperations(paths, async (p) => {
+      const { target } = await macMutationTarget(p, os.homedir(), os.tmpdir());
+      await shell.trashItem(target);
+    });
     const res: OpResult = { ok: [], failed: [] };
     for (const p of paths) {
       const why = protectedReason(p);
@@ -341,6 +359,7 @@ function registerIpc() {
   });
 
   ipcMain.handle('remove', async (_e, paths: string[], mode: 'permanent' | 'contents'): Promise<OpResult> => {
+    if (isMac) return macOperations(paths, (p) => removeMacPath(p, mode, os.homedir(), os.tmpdir()));
     const res: OpResult = { ok: [], failed: [] };
     for (const p of paths) {
       const why = protectedReason(p);
@@ -373,6 +392,10 @@ function registerIpc() {
   });
 
   ipcMain.handle('emptyRecycleBin', async (_e, root: string): Promise<OpResult> => {
+    if (isMac) return macOperations([root], async () => {
+      const { trashPath } = await macScanScope(root);
+      await emptyMacTrash(trashPath);
+    });
     const letter = /^[a-z]/i.exec(root)?.[0]?.toUpperCase() ?? systemDrive[0];
     try {
       await runPowerShell(`Clear-RecycleBin -DriveLetter ${letter} -Force -ErrorAction SilentlyContinue`, 120000);
@@ -383,6 +406,7 @@ function registerIpc() {
   });
 
   ipcMain.handle('diskCleanup', (_e, root: string) => {
+    if (isMac) return;
     const letter = /^[a-z]/i.exec(root)?.[0]?.toUpperCase() ?? systemDrive[0];
     spawn('cleanmgr.exe', [`/d`, letter], { detached: true, stdio: 'ignore' }).unref();
   });
@@ -391,6 +415,7 @@ function registerIpc() {
     saveChrome(o);
     if (!win) return;
     win.setBackgroundColor(o.color);
+    if (isMac) return;
     try {
       win.setTitleBarOverlay({ color: o.color, symbolColor: o.symbol, height: 48 });
     } catch {
@@ -432,7 +457,9 @@ function createWindow() {
     backgroundColor: chrome.color,
     title: 'Dustmap',
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: chrome.color, symbolColor: chrome.symbol, height: 48 },
+    ...(isMac
+      ? { trafficLightPosition: { x: 14, y: 18 } }
+      : { titleBarOverlay: { color: chrome.color, symbolColor: chrome.symbol, height: 48 } }),
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
@@ -488,11 +515,15 @@ function createWindow() {
 
 app.whenReady().then(() => {
   registerIpc();
-  drivesCache = listDrives();
+  if (!isMac) drivesCache = listDrives();
   createWindow();
 });
 
 app.on('window-all-closed', () => {
   engine.kill();
-  app.quit();
+  if (!isMac) app.quit();
+});
+
+app.on('activate', () => {
+  if (!win) createWindow();
 });

@@ -439,6 +439,9 @@ export function computeInsights(s: ScanState): Insight[] {
   };
   const lowerKids = (id: number) => t.childIds(id).map((c) => t.names[c].toLowerCase());
 
+  const mac = s.mac;
+  if (mac && s.root === mac.trashPath && t.aAlloc[s.rootId] > 0) add(I.trash, s.rootId);
+
   const scanDownloads = (dl: number) => {
     for (let c = t.first[dl]; c !== -1; c = t.next[c]) {
       if (t.flags[c] & F_LINK) continue;
@@ -466,11 +469,17 @@ export function computeInsights(s: ScanState): Insight[] {
       if (f & F_DIR) {
         const cctx = t.ctx[c];
         const ccat = ctxCat(cctx);
-        if (cd === 1 && ccat === Cat.trash) {
+        if (mac && ccat === Cat.trash) {
+          const full = t.path(c);
+          if (full === mac.trashPath && v > 0) add(I.trash, c);
+          else if (mac.trashPath.startsWith(full + '/')) stack.push(c, cd);
+          continue;
+        }
+        if (!mac && cd === 1 && ccat === Cat.trash) {
           if (v > 0) add(I.trash, c);
           continue;
         }
-        if (cd === 1 && lower === 'windows.old') {
+        if (!mac && cd === 1 && lower === 'windows.old') {
           add(I.windowsOld, c);
           continue;
         }
@@ -479,7 +488,8 @@ export function computeInsights(s: ScanState): Insight[] {
           continue;
         }
         if (ccat === Cat.caches && pcat !== Cat.caches) {
-          if (v >= 4 * MB) add(I.caches, c);
+          const full = mac ? t.path(c) : '';
+          if (v >= 4 * MB && (!mac || mac.cacheRoots.some((dir) => full === dir || full.startsWith(dir + '/')))) add(I.caches, c);
           continue;
         }
         const rule = REBUILDABLE[lower];
@@ -497,7 +507,7 @@ export function computeInsights(s: ScanState): Insight[] {
           continue;
         }
         if (v >= MB) stack.push(c, cd);
-      } else if (cd === 1 && lower === 'hiberfil.sys') {
+      } else if (!mac && cd === 1 && lower === 'hiberfil.sys') {
         if (v >= GB) add(I.hibernation, c);
       } else if (v >= 512 * MB && !MANAGED.has(pcat) && t.aLast[c] > 0 && t.aLast[c] < now - 365 * DAY) {
         add(I.largeOld, c);

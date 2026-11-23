@@ -4,7 +4,8 @@ import type { EngineEvent, StorageApi } from '../shared/types';
 
 const api: StorageApi = {
   startup: () => ipcRenderer.invoke('startup'),
-  drives: () => ipcRenderer.invoke('drives'),
+  drives: (refresh) => ipcRenderer.invoke('drives', refresh),
+  openDiskAccessSettings: () => ipcRenderer.invoke('openDiskAccessSettings'),
   relaunchElevated: (root) => ipcRenderer.invoke('relaunchElevated', root),
   chooseFolder: () => ipcRenderer.invoke('chooseFolder'),
   pathForFile: (file) => webUtils.getPathForFile(file),

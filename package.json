@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node scripts/build.mjs --engine-only && node dist-electron/cli.cjs --selftest",
     "bench": "node scripts/build.mjs --engine-only && node dist-electron/cli.cjs",
-    "dist": "node scripts/build.mjs && electron-builder --win",
+    "dist": "node scripts/build.mjs --require-native && electron-builder",
     "video:record": "node scripts/build.mjs && electron . --record=video-out/take --theme=dark --lang=en",
     "video:compose": "electron scripts/video/compose.cjs --in=video-out/take --out=video-out/dustmap-demo.mp4"
   },
@@ -32,7 +32,8 @@
       "package.json"
     ],
     "asarUnpack": [
-      "dist-electron/sc-walker.exe"
+      "dist-electron/sc-walker.exe",
+      "dist-electron/mac-walker"
     ],
     "electronLanguages": [
       "en-US",
@@ -48,6 +49,13 @@
         "portable"
       ],
       "icon": "build/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png",
+      "artifactName": "Dustmap-${version}-mac-${arch}.${ext}",
+      "category": "public.app-category.utilities",
+      "minimumSystemVersion": "13.0.0"
     },
     "nsis": {
       "oneClick": false,

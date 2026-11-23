@@ -415,6 +415,9 @@ kbd {
   border-bottom: 1px solid var(--line);
   user-select: none;
 }
+.titlebar.mac {
+  padding: 0 16px 0 88px;
+}
 .titlebar button,
 .titlebar input,
 .titlebar label {
@@ -526,6 +529,11 @@ kbd {
   width: min(1060px, 100%);
   margin: 0 auto;
   animation: pop 0.35s ease-out;
+}
+.home-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .home-head {
   display: flex;

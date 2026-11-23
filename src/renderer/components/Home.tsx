@@ -1,10 +1,11 @@
-import { Disc, FolderOpen, Globe, HardDrive, ShieldCheck, Usb, Zap } from 'lucide-react';
+import { useEffect } from 'react';
+import { Disc, FolderOpen, Globe, HardDrive, RefreshCw, ShieldCheck, Usb, Zap } from 'lucide-react';
 import type { DriveInfo } from '../../shared/types';
 import { api } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { fmtBytes } from '../lib/format';
-import { elevate, startScan, useStore } from '../state';
-import { Button, Spinner } from './ui';
+import { elevate, refreshDrives, startScan, useStore } from '../state';
+import { Button, IconButton, Spinner } from './ui';
 import { ThemeToggle } from './ThemeToggle';
 
 const ICONS = { fixed: HardDrive, removable: Usb, network: Globe, cdrom: Disc, unknown: HardDrive };
@@ -13,7 +14,15 @@ export function Home() {
   const t = useT();
   const drives = useStore((s) => s.drives);
   const elevated = useStore((s) => !!s.startup?.elevated);
-  const sorted = [...(drives ?? [])].sort((a, b) => Number(b.system) - Number(a.system) || a.letter.localeCompare(b.letter));
+  const mac = useStore((s) => s.startup?.platform === 'darwin');
+  const sorted = [...(drives ?? [])].sort((a, b) => Number(b.system) - Number(a.system) || (a.letter ?? a.label).localeCompare(b.letter ?? b.label));
+
+  useEffect(() => {
+    if (!mac) return;
+    const onFocus = () => void refreshDrives();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [mac]);
   return (
     <div className="home">
       <div className="home-inner">
@@ -22,7 +31,12 @@ export function Home() {
             <h1 className="home-title">{t('home.title')}</h1>
             <p className="home-sub">{t('home.subtitle')}</p>
           </div>
-          <ThemeToggle />
+          {mac ? (
+            <div className="home-controls">
+              <IconButton icon={RefreshCw} label={t('mac.refreshDrives')} onClick={() => void refreshDrives()} />
+              <ThemeToggle />
+            </div>
+          ) : <ThemeToggle />}
         </div>
         <div className="drive-grid">
           {!drives && (
@@ -50,7 +64,7 @@ export function Home() {
             </Button>
           </div>
         </div>
-        <div className={`turbo${elevated ? ' is-on' : ''}`}>
+        {!mac && <div className={`turbo${elevated ? ' is-on' : ''}`}>
           {elevated ? <ShieldCheck size={18} aria-hidden /> : <Zap size={18} aria-hidden />}
           <div>
             <div className="turbo-title">{elevated ? t('turbo.active') : t('turbo.title')}</div>
@@ -61,7 +75,7 @@ export function Home() {
               {t('turbo.enable')}
             </Button>
           )}
-        </div>
+        </div>}
         <p className="muted small privacy">{t('home.privacy')}</p>
       </div>
     </div>
@@ -74,7 +88,8 @@ function DriveCard({ d }: { d: DriveInfo }) {
   const Icon = ICONS[d.kind] ?? HardDrive;
   const used = d.total - d.free;
   const share = d.total ? used / d.total : 0;
-  const name = `${d.label || t(`drive.${d.kind}`)} (${d.letter}:)`;
+  const label = d.label || t(`drive.${d.kind}`);
+  const name = d.letter ? `${label} (${d.letter}:)` : label;
   return (
     <button type="button" className="drive-card" onClick={() => startScan(d.root)} aria-label={`${t('home.scan')} ${name}`}>
       <div className="drive-top">

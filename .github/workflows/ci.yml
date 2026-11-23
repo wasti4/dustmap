@@ -5,34 +5,67 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build:
-    runs-on: windows-latest
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            runner: windows-latest
+            artifact: dustmap-windows
+            files: release/*.exe
+          - name: macOS Apple Silicon
+            runner: macos-15
+            artifact: dustmap-macos-arm64
+            files: release/*-arm64.dmg
+          - name: macOS Intel
+            runner: macos-15-intel
+            artifact: dustmap-macos-x64
+            files: release/*-x64.dmg
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
         env:
-          # electron-builder downloads its own copy of Electron when packaging.
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
-      - name: Type check
-        run: npm run typecheck
+      - run: npm run typecheck
+      - run: npm test
+      - run: SC_NO_HELPER=1 node dist-electron/cli.cjs --selftest
+        if: runner.os == 'macOS'
+        name: Test macOS without the native helper
 
-      - name: Engine self-test
-        run: npm test
-
-      - name: Build installer and portable exe
+      - name: Package Windows
+        if: runner.os == 'Windows'
         run: npm run dist -- --publish never
+
+      - name: Package macOS
+        if: runner.os == 'macOS'
+        run: npm run dist -- --publish never -c.mac.identity=-
+
+      - name: Mount and smoke-test the macOS installer
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          hdiutil verify ${{ matrix.files }}
+          mount="$RUNNER_TEMP/dustmap-dmg"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" ${{ matrix.files }}
+          trap 'hdiutil detach "$mount"' EXIT
+          codesign --verify --deep --strict "$mount/Dustmap.app"
+          node scripts/desktop-smoke.mjs "$mount/Dustmap.app/Contents/MacOS/Dustmap"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dustmap-windows
-          path: release/*.exe
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.files }}
           if-no-files-found: error

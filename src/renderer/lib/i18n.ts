@@ -30,6 +30,27 @@ const en = {
   'drive.network': 'Network drive',
   'drive.cdrom': 'Optical drive',
   'drive.unknown': 'Drive',
+  'mac.refreshDrives': 'Refresh drives',
+  'mac.diskAccess.title': 'Full Disk Access',
+  'mac.diskAccess.hint': 'Allow Dustmap in System Settings to include folders protected by macOS. Reopen Dustmap afterward.',
+  'mac.diskAccess.open': 'Open System Settings',
+  'mac.unreadable': '{count} entries could not be read. Full Disk Access can include folders protected by macOS.',
+  'mac.unaccounted': '{size} outside this scan, including protected folders, snapshots or other APFS volumes.',
+  'mac.systemCategory': 'macOS files, system libraries and protected areas.',
+  'mac.trash': 'Trash',
+  'mac.trashInsight': 'Your Trash on this drive holds {size}.',
+  'mac.emptyTrash': 'Empty Trash',
+  'mac.emptyTrashHint': 'Permanently deletes the contents of your Trash on this drive.',
+  'mac.trashAction': 'Move to Trash',
+  'mac.trashHint': 'You can restore them from the Trash.',
+  'mac.cachesHint': 'Quit the affected apps before clearing their caches. They may rebuild these files later.',
+  'mac.metricHint': 'On-disk sizes are estimates. APFS clones and snapshots can keep blocks in use after deletion.',
+  'mac.reveal': 'Show in Finder',
+  'mac.inTrash': 'Goes to the Trash',
+  'mac.installersHint': 'Installers and archives downloaded over 2 weeks ago. They go to the Trash.',
+  'mac.oldDownloadsHint': 'Downloads unused for 3+ months. They go to the Trash.',
+  'mac.largeOldHint': 'Files over 512 MB unused for a year. They go to the Trash.',
+
   'turbo.title': 'Turbo scan',
   'turbo.body': 'Reads the NTFS file table directly: a whole drive in a few seconds, protected folders included. Needs administrator rights.',
   'turbo.enable': 'Restart as administrator',
@@ -266,6 +287,27 @@ const ru: Dict = {
   'drive.network': 'Сетевой диск',
   'drive.cdrom': 'Оптический диск',
   'drive.unknown': 'Диск',
+  'mac.refreshDrives': 'Обновить список дисков',
+  'mac.diskAccess.title': 'Полный доступ к диску',
+  'mac.diskAccess.hint': 'Разрешите Dustmap доступ в системных настройках, чтобы сканировать защищённые папки. После этого откройте приложение заново.',
+  'mac.diskAccess.open': 'Открыть системные настройки',
+  'mac.unreadable': 'Не удалось прочитать объектов: {count}. Полный доступ к диску позволяет сканировать папки, защищённые macOS.',
+  'mac.unaccounted': '{size} за пределами сканирования, в том числе защищённые папки, снимки или другие тома APFS.',
+  'mac.systemCategory': 'Файлы macOS, системные библиотеки и защищённые области.',
+  'mac.trash': 'Корзина',
+  'mac.trashInsight': 'Ваша корзина на этом диске занимает {size}.',
+  'mac.emptyTrash': 'Очистить корзину',
+  'mac.emptyTrashHint': 'Безвозвратно удаляет содержимое вашей корзины на этом диске.',
+  'mac.trashAction': 'Переместить в корзину',
+  'mac.trashHint': 'Объекты можно восстановить из корзины.',
+  'mac.cachesHint': 'Закройте соответствующие приложения перед очисткой их кэша. При необходимости они создадут эти файлы снова.',
+  'mac.metricHint': 'Размер на диске приблизительный. Клоны и снимки APFS могут удерживать блоки после удаления файлов.',
+  'mac.reveal': 'Показать в Finder',
+  'mac.inTrash': 'Отправляется в корзину',
+  'mac.installersHint': 'Установщики и архивы, скачанные больше двух недель назад. Они отправятся в корзину.',
+  'mac.oldDownloadsHint': 'Загрузки, которыми не пользовались больше трёх месяцев. Они отправятся в корзину.',
+  'mac.largeOldHint': 'Файлы больше 512 МБ, которыми не пользовались год. Они отправятся в корзину.',
+
   'turbo.title': 'Турбо-сканирование',
   'turbo.body': 'Читает таблицу файлов NTFS напрямую: весь диск за несколько секунд, включая защищённые папки. Нужны права администратора.',
   'turbo.enable': 'Перезапустить от администратора',
@@ -487,13 +529,37 @@ export function detectLang(): Lang {
   return 'en';
 }
 
-export function translate(lang: Lang, key: TKey, vars?: Record<string, string | number>): string {
-  let s: string = dicts[lang][key] ?? en[key] ?? key;
+const MAC_KEYS: Partial<Record<TKey, TKey>> = {
+  'w.unreadable': 'mac.unreadable',
+  'w.unaccounted': 'mac.unaccounted',
+  'cat.trash': 'mac.trash',
+  'catd.system': 'mac.systemCategory',
+  'ins.trash': 'mac.trashInsight',
+  'insA.trash': 'mac.emptyTrash',
+  'insT.trash': 'mac.trash',
+  'insE.trash': 'mac.emptyTrashHint',
+  'insE.caches': 'mac.cachesHint',
+  'insE.installers': 'mac.installersHint',
+  'insE.oldDownloads': 'mac.oldDownloadsHint',
+  'insE.largeOld': 'mac.largeOldHint',
+  'ins.recycle': 'mac.inTrash',
+  'act.reveal': 'mac.reveal',
+  'act.trash': 'mac.trashAction',
+  'dlg.trash': 'mac.trashAction',
+  'dlg.empty': 'mac.emptyTrash',
+  'dlg.trashNote': 'mac.trashHint',
+  'set.metricHint': 'mac.metricHint',
+};
+
+export function translate(lang: Lang, key: TKey, vars?: Record<string, string | number>, mac = false): string {
+  const translated = mac ? MAC_KEYS[key] ?? key : key;
+  let s: string = dicts[lang][translated] ?? en[translated] ?? key;
   if (vars) for (const k in vars) s = s.split(`{${k}}`).join(String(vars[k]));
   return s;
 }
 
 export function useT() {
   const lang = useStore((s) => s.lang);
-  return (key: TKey, vars?: Record<string, string | number>) => translate(lang, key, vars);
+  const mac = useStore((s) => s.startup?.platform === 'darwin');
+  return (key: TKey, vars?: Record<string, string | number>) => translate(lang, key, vars, mac);
 }
