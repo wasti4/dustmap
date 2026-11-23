@@ -1,7 +1,7 @@
 // Smart categorisation: a directory "context" flows top-down (Windows, Program
 // Files, AppData caches, node_modules, Steam libraries...), and files without a
 // context are categorised by extension.
-import { Cat } from '../shared/types';
+import { Cat, type DesktopPlatform } from '../shared/types';
 
 // Context byte layout:
 //   bits 0-3: category index + 1 (0 = no context category)
@@ -152,8 +152,31 @@ const GAME_NAMES = new Set([
   'hoyoplay',
 ]);
 
+const MAC_SYSTEM = new Set(['system', 'bin', 'sbin', 'usr', 'private', 'cores', 'dev', 'network', '.fseventsd', '.spotlight-v100', '.documentrevisions-v100', '.temporaryitems']);
+
+function macDirContext(parentCtx: number, name: string, depth: number, parentName: string): number {
+  const cur = ctxCat(parentCtx);
+  if (cur === Cat.trash || cur === Cat.caches || cur === Cat.system) return parentCtx;
+  if (depth === 1) {
+    if (name === '.trashes' || name === '.trash') return withCat(parentCtx, Cat.trash);
+    if (MAC_SYSTEM.has(name) || name === 'library') return withCat(parentCtx, Cat.system);
+  }
+  let ctx = parentCtx;
+  if (depth === 2 && parentName === 'users') return ctx | CTX_PROFILE;
+  if (name === '.trash' && ctx & CTX_PROFILE) return withCat(ctx, Cat.trash);
+  if (name === 'downloads') ctx |= CTX_DL;
+  if (name === 'caches' && parentName === 'library' && ctx & CTX_PROFILE) return withCat(ctx, Cat.caches);
+  if (name === '.cache' && ctx & CTX_PROFILE) return withCat(ctx, Cat.caches);
+  if (name === 'library' && ctx & CTX_PROFILE && depth === 3) return withCat(ctx | CTX_APPDATA, Cat.apps);
+  if (name === 'applications' || name.endsWith('.app') || name.endsWith('.framework')) return withCat(ctx, Cat.apps);
+  if (cur !== Cat.developer && GAME_NAMES.has(name)) return withCat(ctx, Cat.games);
+  if (DEV_NAMES.has(name) || name === 'deriveddata' && parentName === 'xcode') return withCat(ctx, Cat.developer);
+  return ctx;
+}
+
 /** Computes the context of a directory from its parent's context and its name. */
-export function dirContext(parentCtx: number, name: string, depth: number, parentName: string): number {
+export function dirContext(parentCtx: number, name: string, depth: number, parentName: string, platform: DesktopPlatform = 'win32'): number {
+  if (platform === 'darwin') return macDirContext(parentCtx, name, depth, parentName);
   let ctx = parentCtx;
   const cur = ctxCat(parentCtx);
   if (cur === Cat.trash) return ctx;
@@ -186,13 +209,15 @@ export function dirContext(parentCtx: number, name: string, depth: number, paren
 }
 
 /** Initial context for a scan root: classify each path segment from the volume root. */
-export function contextForPath(path: string): { ctx: number; depth: number } {
-  const segs = path.replace(/[\\/]+$/, '').split(/[\\/]+/).slice(1);
+export function contextForPath(path: string, platform: DesktopPlatform = 'win32', volume = '/'): { ctx: number; depth: number } {
+  const segs = platform === 'darwin'
+    ? path.slice(volume === '/' ? 0 : volume.length).split('/').filter(Boolean)
+    : path.replace(/[\\/]+$/, '').split(/[\\/]+/).slice(1);
   let ctx = 0;
   let parent = '';
   for (let i = 0; i < segs.length; i++) {
     const n = segs[i].toLowerCase();
-    ctx = dirContext(ctx, n, i + 1, parent);
+    ctx = dirContext(ctx, n, i + 1, parent, platform);
     parent = n;
   }
   return { ctx, depth: segs.length };
@@ -207,7 +232,7 @@ reg(
   Cat.documents,
   'pdf doc docx docm xls xlsx xlsm xlsb ppt pptx odt ods odp rtf txt md epub fb2 djvu mobi azw3 csv tex pages numbers key one onepkg pst ost msg eml vsdx pub xps oxps',
 );
-reg(Cat.archives, 'zip rar 7z tar gz tgz bz2 xz zst lz4 cab iso img vhd vhdx vmdk qcow2 dmg msi msix msixbundle appx appxbundle wim esd apk xapk torrent');
+reg(Cat.archives, 'zip rar 7z tar gz tgz bz2 xz zst lz4 cab iso img vhd vhdx vmdk qcow2 dmg pkg msi msix msixbundle appx appxbundle wim esd apk xapk torrent');
 reg(Cat.apps, 'exe dll ocx cpl msc drv appref-ms');
 // Game data: Bethesda, Unreal, Unity, Valve, FromSoftware, Rockstar and friends.
 reg(Cat.games, 'bsa ba2 esp esm esl nif dds pak upk uasset uexp ubulk utoc ucas umap bdt bhd vpk gcf forge sga rpf wad pck bank unity3d assets ress');
@@ -225,10 +250,10 @@ export function extOf(nameLower: string): string {
 }
 
 /** Category for a file given its parent directory context. */
-export function fileCategory(parentCtx: number, nameLower: string, size: number, atVolumeRoot: boolean): number {
+export function fileCategory(parentCtx: number, nameLower: string, size: number, atVolumeRoot: boolean, platform: DesktopPlatform = 'win32'): number {
   const c = ctxCat(parentCtx);
   if (c >= 0) return c;
-  if (atVolumeRoot && (ROOT_SYSTEM_FILES.has(nameLower) || nameLower.startsWith('$'))) return Cat.system;
+  if (platform === 'win32' && atVolumeRoot && (ROOT_SYSTEM_FILES.has(nameLower) || nameLower.startsWith('$'))) return Cat.system;
   const ext = extOf(nameLower);
   const cat = EXT.get(ext);
   if (cat === undefined) return Cat.other;
@@ -237,4 +262,4 @@ export function fileCategory(parentCtx: number, nameLower: string, size: number,
   return cat;
 }
 
-export const INSTALLER_EXTS = new Set(['exe', 'msi', 'msix', 'msixbundle', 'appx', 'zip', 'rar', '7z', 'iso', 'img', 'cab', 'tar', 'gz', 'tgz', 'apk', 'torrent']);
+export const INSTALLER_EXTS = new Set(['exe', 'msi', 'msix', 'msixbundle', 'appx', 'dmg', 'pkg', 'zip', 'rar', '7z', 'iso', 'img', 'cab', 'tar', 'gz', 'tgz', 'apk', 'torrent']);

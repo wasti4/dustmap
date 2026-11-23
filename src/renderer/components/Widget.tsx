@@ -30,6 +30,8 @@ export function Widget() {
   const progress = useStore((s) => s.progress);
   const scanning = useStore((s) => s.scanning);
   const scanRoot = useStore((s) => s.scanRoot);
+  const mac = useStore((s) => s.startup?.platform === 'darwin');
+  const drives = useStore((s) => s.drives);
   const insights = useStore((s) => s.insights);
   const freed = useStore((s) => s.freed);
   const dark = useStore((s) => s.dark);
@@ -43,7 +45,9 @@ export function Widget() {
     return () => clearTimeout(id);
   }, [freed]);
 
-  const isVolume = summary ? summary.isVolume : /^[A-Za-z]:\\?$/.test(scanRoot ?? '');
+  const isVolume = summary?.isVolume ?? (mac
+    ? scanRoot === '/' || !!drives?.some((drive) => drive.root === scanRoot)
+    : /^[A-Za-z]:\\?$/.test(scanRoot ?? ''));
   const total = summary?.total ?? progress?.total ?? 0;
   const free = summary?.free ?? progress?.free ?? 0;
 
@@ -55,19 +59,21 @@ export function Widget() {
       const scanned = progress?.bytes ?? 0;
       return { values: cats, neutral, capacity: isVolume ? Math.max(total, 1) : Math.max(scanned * 1.15, 1), headline: scanned, unaccounted: 0 };
     }
-    const vals = summary.cats.map((c) => (metric === 'size' ? c.size : c.alloc));
+    const vals = summary.cats.map((c) => (metric === 'size' && !(mac && summary.isVolume) ? c.size : c.alloc));
     const sum = vals.reduce((a, b) => a + b, 0);
     if (summary.isVolume && summary.total) {
       const used = summary.total - summary.free;
       const extra = Math.max(0, used - sum);
+      if (mac) return { values: vals, neutral: extra, capacity: Math.max(sum, summary.total), headline: used, unaccounted: extra };
       vals[Cat.system] += extra;
       return { values: vals, neutral: 0, capacity: summary.total, headline: used, unaccounted: extra };
     }
     return { values: vals, neutral: 0, capacity: Math.max(sum, 1), headline: sum, unaccounted: 0 };
-  }, [scanning, summary, progress, metric, isVolume, total]);
+  }, [scanning, summary, progress, metric, isVolume, total, mac]);
 
   const [num, unit] = bytesParts(headline, lang);
-  const folderName = (summary?.root ?? scanRoot ?? '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? '';
+  const root = summary?.root ?? scanRoot ?? '';
+  const folderName = mac ? root.replace(/\/+$/, '').split('/').pop() || root : root.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? '';
   const top = insights?.[0];
   const recentFreed = freed && Date.now() - freed.at < 20000 ? freed : null;
 
@@ -80,10 +86,12 @@ export function Widget() {
         <span className="muted">{fmtBytes(values[hover], lang)}</span>
         <span className="muted ellipsis">
           {t(`catd.${CATEGORIES[hover]}`)}
-          {hover === Cat.system && unaccounted > 1024 ** 3 ? ` (${t('w.unaccounted', { size: fmtBytes(unaccounted, lang) })})` : ''}
+          {!mac && hover === Cat.system && unaccounted > 1024 ** 3 ? ` (${t('w.unaccounted', { size: fmtBytes(unaccounted, lang) })})` : ''}
         </span>
       </>
     );
+  } else if (mac && hover === -2 && !scanning) {
+    status = <span className="muted ellipsis">{t('w.unaccounted', { size: fmtBytes(unaccounted, lang) })}</span>;
   } else if (scanning) {
     const label = progress?.phase === 'mft' ? t('w.readingMft') : progress?.phase === 'build' || progress?.phase === 'analyze' ? t('w.building') : t('w.scanning');
     status = (

@@ -72,7 +72,11 @@ export function fmtDate(sec: number, lang: Lang): string {
 }
 
 export function shortPath(p: string, home: string): string {
-  if (home && p.toLowerCase().startsWith(home.toLowerCase())) return '~' + p.slice(home.length);
+  const sep = home.startsWith('/') ? '/' : '\\';
+  if (!home) return p;
+  const prefix = sep === '/' ? home : home.toLowerCase();
+  const full = sep === '/' ? p : p.toLowerCase();
+  if (full === prefix || full.startsWith(prefix + sep)) return '~' + p.slice(home.length);
   return p;
 }
 

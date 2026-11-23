@@ -23,7 +23,7 @@ export function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey && e.key.toLowerCase() === 'f') || (e.key === '/' && !(e.target instanceof HTMLInputElement))) {
+      if (((getState().startup?.platform === 'darwin' ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === 'f') || (e.key === '/' && !(e.target instanceof HTMLInputElement))) {
         const el = document.getElementById('global-search') as HTMLInputElement | null;
         if (el) {
           e.preventDefault();
@@ -69,6 +69,7 @@ function TitleBar() {
   const summary = useStore((s) => s.summary);
   const scanRoot = useStore((s) => s.scanRoot);
   const search = useStore((s) => s.search);
+  const mac = useStore((s) => s.startup?.platform === 'darwin');
   const prevTab = useRef<Tab>('folders');
   const root = summary?.root ?? scanRoot;
 
@@ -79,7 +80,7 @@ function TitleBar() {
   };
 
   return (
-    <header className="titlebar">
+    <header className={mac ? 'titlebar mac' : 'titlebar'}>
       <div className="brand">
         <Logo />
         <span>{t('app.name')}</span>
@@ -109,7 +110,7 @@ function TitleBar() {
                 <X size={14} />
               </button>
             ) : (
-              <kbd>Ctrl F</kbd>
+              <kbd>{mac ? '⌘ F' : 'Ctrl F'}</kbd>
             )}
           </label>
         </>
@@ -139,18 +140,20 @@ function Workspace() {
   const summary = useStore((s) => s.summary);
   const elevated = useStore((s) => !!s.startup?.elevated);
   const turbo = useStore((s) => s.prefs.turbo);
+  const mac = useStore((s) => s.startup?.platform === 'darwin');
   return (
     <div className="workspace">
       <aside className="col-left">
         <Widget />
         <InsightList />
-        {summary && !scanning && summary.errors > 0 && !elevated && (
+        {summary && !scanning && summary.errors > 0 && (mac || !elevated) && (
           <p className="note">
             <Info size={14} aria-hidden />
             {t('w.unreadable', { count: fmtCount(summary.errors, lang) })}
+            {mac && <Button small onClick={() => void api.openDiskAccessSettings()}>{t('mac.diskAccess.open')}</Button>}
           </p>
         )}
-        {summary && !scanning && summary.isVolume && summary.mode === 'walk' && !elevated && turbo && (
+        {summary && !scanning && summary.isVolume && summary.mode === 'walk' && !mac && !elevated && turbo && (
           <div className="turbo compact">
             <Zap size={16} aria-hidden />
             <div className="small">{t('turbo.body')}</div>

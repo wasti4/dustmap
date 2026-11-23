@@ -34,10 +34,11 @@ export const NF = {
 export type Metric = 'alloc' | 'size';
 export type SortKey = 'value' | 'name' | 'files' | 'mtime' | 'last';
 export type ScanMode = 'mft' | 'walk';
+export type DesktopPlatform = 'win32' | 'darwin';
 
 export interface DriveInfo {
-  root: string; // "C:\\"
-  letter: string; // "C"
+  root: string; // Windows drive root or macOS mount point
+  letter?: string; // Windows drive letter
   label: string;
   fs: string;
   total: number;
@@ -211,6 +212,7 @@ export type EngineEvent =
   | { type: 'error'; data: { scanId: number; message: string } };
 
 export interface StartupInfo {
+  platform: DesktopPlatform;
   elevated: boolean;
   autoScan?: string;
   systemDrive: string;
@@ -221,7 +223,8 @@ export interface StartupInfo {
 /** API exposed to the renderer by the preload script as `window.storage`. */
 export interface StorageApi {
   startup(): Promise<StartupInfo>;
-  drives(): Promise<DriveInfo[]>;
+  drives(refresh?: boolean): Promise<DriveInfo[]>;
+  openDiskAccessSettings(): Promise<void>;
   relaunchElevated(resumeRoot?: string): Promise<boolean>;
   chooseFolder(): Promise<string | null>;
   pathForFile(file: File): string;

@@ -25,6 +25,7 @@ export function Explorer() {
   const focusId = useStore((s) => s.focusId);
   const version = useStore((s) => s.version);
   const view = useStore((s) => s.prefs.view);
+  const mac = useStore((s) => s.startup?.platform === 'darwin');
   const [detail, setDetail] = useState<NodeDetail | null>(null);
 
   useEffect(() => {
@@ -48,7 +49,7 @@ export function Explorer() {
             <span key={c.id} className="crumb-wrap">
               {i > 0 && <ChevronRight size={14} className="crumb-sep" aria-hidden />}
               <button type="button" className={`crumb${i === crumbs.length - 1 ? ' is-current' : ''}`} onClick={() => focusNode(c.id)} aria-current={i === crumbs.length - 1 ? 'page' : undefined}>
-                {c.name.replace(/\\$/, '') || c.name}
+                {mac ? c.name : c.name.replace(/\\$/, '') || c.name}
               </button>
             </span>
           ))}

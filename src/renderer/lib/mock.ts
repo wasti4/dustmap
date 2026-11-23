@@ -200,7 +200,7 @@ export function createMockApi(): StorageApi {
   const findIds = (paths: string[]) => paths.map((p) => p);
 
   return {
-    startup: () => delay({ elevated: false, systemDrive: 'C:', home: 'C:\\Users\\Alex', version: '0.1.0 (demo)', autoScan: new URLSearchParams(location.search).get('scan') ?? undefined }),
+    startup: () => delay({ platform: 'win32', elevated: false, systemDrive: 'C:', home: 'C:\\Users\\Alex', version: '0.1.0 (demo)', autoScan: new URLSearchParams(location.search).get('scan') ?? undefined }),
     drives: () =>
       delay([
         { root: 'C:\\', letter: 'C', label: 'Windows', fs: 'NTFS', total, free: 154 * GB, kind: 'fixed', system: true },
@@ -228,6 +228,7 @@ export function createMockApi(): StorageApi {
     remove: (paths) => delay({ ok: findIds(paths), failed: [] }, 600),
     emptyRecycleBin: (root) => delay({ ok: [root], failed: [] }, 500),
     diskCleanup: () => delay(undefined),
+    openDiskAccessSettings: () => delay(undefined),
     space: () => delay({ total, free }),
     setChrome: () => delay(undefined),
   };

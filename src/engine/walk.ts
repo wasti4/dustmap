@@ -1,6 +1,7 @@
 // Portable scanner: highly concurrent readdir + lstat on the libuv thread pool.
 // Works on any file system and without administrator rights.
 import fs from 'node:fs';
+import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { Cat } from '../shared/types';
 import { Tree, F_DIR, F_LINK, F_ERR } from './tree';
@@ -14,6 +15,7 @@ export interface WalkStats {
   path: string;
   cats: Float64Array;
   cancelled: boolean;
+  bulkEntries?: number;
 }
 
 const toSec = (ms: number) => (ms > 0 ? Math.floor(ms / 1000) : 0);
@@ -64,7 +66,7 @@ export function walkInto(tree: Tree, startId: number, startPath: string, baseDep
         }
         const ctx = tree.ctx[id];
         const parentName = tree.names[id].toLowerCase();
-        const sep = dirPath.endsWith('\\') ? '' : '\\';
+        const sep = dirPath.endsWith(path.sep) ? '' : path.sep;
         const atRoot = depth === 0;
         let pending = 1;
         const fin = () => {

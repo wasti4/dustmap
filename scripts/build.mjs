@@ -13,7 +13,8 @@ const engineOnly = args.has('--engine-only');
 const t = Date.now();
 await build(nodeBundles({ engineOnly }));
 console.log(`[build] node bundles ready in ${Date.now() - t} ms`);
-buildHelper();
+if (process.platform === 'darwin') buildMacHelper();
+else buildHelper();
 if (existsSync('build/icon.png')) copyFileSync('build/icon.png', 'dist-electron/icon.png');
 if (!engineOnly) {
   await viteBuild({ configFile: 'vite.config.mjs', logLevel: 'warn' });
@@ -41,5 +42,21 @@ function buildHelper() {
     console.log('[build] native walker ready');
   } catch {
     console.warn('[build] native walker failed to compile - portable walker will be used');
+  }
+}
+
+/** Compiles the native APFS scanner for the architecture used by Electron. */
+function buildMacHelper() {
+  const src = 'src/native/mac-walker.cc';
+  const out = 'dist-electron/mac-walker';
+  if (existsSync(out) && statSync(out).mtimeMs >= Math.max(statSync(src).mtimeMs, statSync('scripts/build.mjs').mtimeMs)) return;
+  mkdirSync('dist-electron', { recursive: true });
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x86_64';
+  try {
+    execFileSync('/usr/bin/xcrun', ['clang++', '-arch', arch, '-std=c++17', '-O2', '-mmacosx-version-min=13.0', resolve(src), '-o', resolve(out)], { stdio: 'inherit' });
+    console.log('[build] macOS native walker ready');
+  } catch (e) {
+    if (args.has('--require-native') || process.env.CI) throw e;
+    console.warn('[build] macOS native walker unavailable - portable walker will be used');
   }
 }

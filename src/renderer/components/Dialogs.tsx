@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Info, ShieldCheck, TriangleExclamationPoint, Zap } from 'lucide-react';
 import { Cat, type NodeInfo } from '../../shared/types';
-import { engine } from '../lib/api';
+import { api, engine } from '../lib/api';
 import { detectLang, LANG_NAMES, useT, type Lang, type LangPref } from '../lib/i18n';
 import { fmtBytes, fmtCount, shortPath } from '../lib/format';
 import { elevate, removeItems, runInsight, setPrefs, setState, useStore, type Dialog } from '../state';
@@ -90,7 +90,6 @@ function InsightDialog({ d, onClose }: { d: Extract<Dialog, { type: 'insight' }>
 
   const chosen = useMemo(() => (items ?? []).filter((n) => !selectable || sel.has(n.id)), [items, sel, selectable]);
   const bytes = chosen.reduce((a, n) => a + n.alloc, 0);
-  const root = useStore((s) => s.summary?.root ?? '');
 
   let action: React.ReactNode = null;
   if (ins.action === 'emptyTrash')
@@ -145,7 +144,7 @@ function InsightDialog({ d, onClose }: { d: Extract<Dialog, { type: 'insight' }>
               {selectable && <Checkbox checked={sel.has(n.id)} onChange={() => setSel((s) => toggled(s, n.id))} label={n.name} />}
               <NodeIcon node={n} size={16} />
               <span className="ellipsis" title={n.path}>
-                {shortPath(n.path ?? n.name, home).replace(root.replace(/\\$/, ''), '') || n.name}
+                {shortPath(n.path ?? n.name, home)}
               </span>
               <span className="num muted">{fmtBytes(n.alloc, lang)}</span>
             </div>
@@ -168,6 +167,7 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
   const prefs = useStore((s) => s.prefs);
   const startup = useStore((s) => s.startup);
   const elevated = !!startup?.elevated;
+  const mac = startup?.platform === 'darwin';
   return (
     <Modal title={t('set.title')} onClose={onClose} width={520} footer={<Button onClick={onClose}>{t('dlg.close')}</Button>}>
       <div className="settings">
@@ -225,23 +225,35 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
             ]}
           />
         </div>
-        <div className="set-row">
-          <span>
-            <Zap size={14} aria-hidden /> {t('set.turbo')}
-            <small className="muted">{t('set.turboHint')}</small>
-          </span>
-          <Switch checked={prefs.turbo} onChange={(v) => setPrefs({ turbo: v })} label={t('set.turbo')} />
-        </div>
-        <div className="set-row set-admin">
-          <span>
-            <ShieldCheck size={14} aria-hidden /> {elevated ? t('set.admin') : t('set.user')}
-          </span>
-          {!elevated && (
-            <Button small icon={Zap} onClick={() => void elevate()}>
-              {t('turbo.enable')}
-            </Button>
-          )}
-        </div>
+        {mac ? (
+          <div className="set-row">
+            <span>
+              <ShieldCheck size={14} aria-hidden /> {t('mac.diskAccess.title')}
+              <small className="muted">{t('mac.diskAccess.hint')}</small>
+            </span>
+            <Button small onClick={() => void api.openDiskAccessSettings()}>{t('mac.diskAccess.open')}</Button>
+          </div>
+        ) : (
+          <>
+            <div className="set-row">
+              <span>
+                <Zap size={14} aria-hidden /> {t('set.turbo')}
+                <small className="muted">{t('set.turboHint')}</small>
+              </span>
+              <Switch checked={prefs.turbo} onChange={(v) => setPrefs({ turbo: v })} label={t('set.turbo')} />
+            </div>
+            <div className="set-row set-admin">
+              <span>
+                <ShieldCheck size={14} aria-hidden /> {elevated ? t('set.admin') : t('set.user')}
+              </span>
+              {!elevated && (
+                <Button small icon={Zap} onClick={() => void elevate()}>
+                  {t('turbo.enable')}
+                </Button>
+              )}
+            </div>
+          </>
+        )}
         <p className="muted small">{t('set.about', { v: startup?.version ?? '' })}</p>
       </div>
     </Modal>

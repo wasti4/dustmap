@@ -4,6 +4,8 @@ import { CATEGORIES } from '../shared/types';
 import { runScan } from './scanner';
 import * as Q from './query';
 import { runMftSelfTest } from './mft-selftest';
+import { runMacSelfTest } from './macos-selftest';
+import { sep } from 'node:path';
 
 const args = process.argv.slice(2);
 const root = args.find((a) => !a.startsWith('--')) ?? process.cwd();
@@ -26,6 +28,7 @@ async function main() {
   );
   const sum = Q.summary(s, 'unknown');
   console.log(`\nScanned ${sum.root} in ${Date.now() - t0} ms using ${sum.mode}${s.turboNote ? ` (turbo: ${s.turboNote})` : ''}`);
+  if (s.macBulkEntries !== undefined) console.log('macOS bulk metadata entries: ' + s.macBulkEntries);
   if (s.turboError) console.log(`turbo error: ${s.turboError}`);
   if (s.phases) console.log('phases (ms): ' + Object.entries(s.phases).map(([k, v]) => `${k}=${v}`).join(' '));
   console.log(`files=${sum.files} dirs=${sum.dirs} errors=${sum.errors} onDisk=${gb(sum.alloc)} size=${gb(sum.size)} volume used=${gb(sum.total - sum.free)}`);
@@ -33,7 +36,7 @@ async function main() {
   sum.cats.forEach((c, i) => c.alloc > 0 && console.log(`  ${CATEGORIES[i].padEnd(10)} ${gb(c.alloc).padStart(12)}  ${c.count} files`));
   const page = Q.children(s, { id: s.rootId, metric: 'alloc', limit: 12 });
   console.log('\nLargest at root:');
-  for (const n of page.items) console.log(`  ${gb(n.alloc).padStart(12)}  ${n.name}${n.dir ? '\\' : ''}`);
+  for (const n of page.items) console.log(`  ${gb(n.alloc).padStart(12)}  ${n.name}${n.dir ? sep : ''}`);
 
   let t = Date.now();
   const tm = Q.treemap(s, { id: s.rootId, w: 1200, h: 700, metric: 'alloc' });
@@ -53,14 +56,12 @@ async function main() {
   console.log(`\nmemory: rss=${(mem.rss / 1048576).toFixed(0)} MB heap=${(mem.heapUsed / 1048576).toFixed(0)} MB arrays=${(mem.arrayBuffers / 1048576).toFixed(0)} MB`);
 }
 
-if (args.includes('--selftest')) {
-  try {
-    runMftSelfTest();
-  } catch (e) {
-    console.error(e);
-    process.exit(1);
-  }
-} else main().catch((e) => {
+async function selfTest() {
+  runMftSelfTest();
+  await runMacSelfTest();
+}
+
+(args.includes('--selftest') ? selfTest() : main()).catch((e) => {
   console.error(e);
   process.exit(1);
 });
