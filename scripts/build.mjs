@@ -49,10 +49,11 @@ function buildHelper() {
 function buildMacHelper() {
   const src = 'src/native/mac-walker.cc';
   const out = 'dist-electron/mac-walker';
-  if (existsSync(out) && statSync(out).mtimeMs >= statSync(src).mtimeMs) return;
+  if (existsSync(out) && statSync(out).mtimeMs >= Math.max(statSync(src).mtimeMs, statSync('scripts/build.mjs').mtimeMs)) return;
   mkdirSync('dist-electron', { recursive: true });
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x86_64';
   try {
-    execFileSync('/usr/bin/xcrun', ['clang++', '-std=c++17', '-O2', '-mmacosx-version-min=13.0', resolve(src), '-o', resolve(out)], { stdio: 'inherit' });
+    execFileSync('/usr/bin/xcrun', ['clang++', '-arch', arch, '-std=c++17', '-O2', '-mmacosx-version-min=13.0', resolve(src), '-o', resolve(out)], { stdio: 'inherit' });
     console.log('[build] macOS native walker ready');
   } catch (e) {
     if (args.has('--require-native') || process.env.CI) throw e;

@@ -64,18 +64,20 @@ export function Home() {
             </Button>
           </div>
         </div>
-        {!mac && <div className={`turbo${elevated ? ' is-on' : ''}`}>
-          {elevated ? <ShieldCheck size={18} aria-hidden /> : <Zap size={18} aria-hidden />}
-          <div>
-            <div className="turbo-title">{elevated ? t('turbo.active') : t('turbo.title')}</div>
-            {!elevated && <div className="muted small">{t('turbo.body')}</div>}
+        {!mac && (
+          <div className={`turbo${elevated ? ' is-on' : ''}`}>
+            {elevated ? <ShieldCheck size={18} aria-hidden /> : <Zap size={18} aria-hidden />}
+            <div>
+              <div className="turbo-title">{elevated ? t('turbo.active') : t('turbo.title')}</div>
+              {!elevated && <div className="muted small">{t('turbo.body')}</div>}
+            </div>
+            {!elevated && (
+              <Button small icon={Zap} onClick={() => void elevate()}>
+                {t('turbo.enable')}
+              </Button>
+            )}
           </div>
-          {!elevated && (
-            <Button small icon={Zap} onClick={() => void elevate()}>
-              {t('turbo.enable')}
-            </Button>
-          )}
-        </div>}
+        )}
         <p className="muted small privacy">{t('home.privacy')}</p>
       </div>
     </div>

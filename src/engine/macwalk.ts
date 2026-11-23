@@ -4,7 +4,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { Cat } from '../shared/types';
-import type { MacScanScope } from '../platform/macos';
+import { MAC_DATA, MAC_MOUNTS, type MacScanScope } from '../platform/macos';
 import { dirContext, fileCategory } from './classify';
 import { Tree, F_DIR, F_ERR, F_HIDDEN, F_LINK } from './tree';
 import type { WalkStats } from './walk';
@@ -105,14 +105,28 @@ export async function walkMacPortable(tree: Tree, startId: number, baseDepth: nu
   const add = macEntries(tree, baseDepth, stats);
   const pending = [{ id: startId, depth: 0, full: scope.root }];
   const trashParent = scope.volume === '/' ? '' : path.posix.dirname(scope.trashPath);
-  while (pending.length && !stats.cancelled) {
+  let data: (typeof pending)[number] | undefined;
+  const seenData = new Set<bigint>();
+  let residual = false;
+  while ((pending.length || data) && !stats.cancelled) {
+    if (!pending.length && data) {
+      pending.push(data);
+      data = undefined;
+      residual = true;
+    }
     const { id, depth, full } = pending.pop()!;
     stats.path = full;
     let names: string[];
     try {
-      const dir = await fs.lstat(full);
-      if (!dir.isDirectory() || !scope.devices.has(dir.dev)) continue;
-      if (full === trashParent) {
+      const dir = await fs.lstat(full, { bigint: true });
+      if (!dir.isDirectory() || !scope.devices.has(Number(dir.dev))) continue;
+      if (Number(dir.dev) === scope.dataDevice) {
+        if (seenData.has(dir.ino)) continue;
+        seenData.add(dir.ino);
+      }
+      if (scope.root === '/' && full === MAC_MOUNTS) {
+        names = scope.dataDevice === undefined ? [] : ['Data'];
+      } else if (full === trashParent) {
         const own = await fs.lstat(scope.trashPath).catch((e: NodeJS.ErrnoException) => {
           if (e.code === 'ENOENT') return null;
           throw e;
@@ -126,15 +140,20 @@ export async function walkMacPortable(tree: Tree, startId: number, baseDepth: nu
     for (let i = 0; i < names.length && !stats.cancelled; i += 64) {
       await Promise.all(names.slice(i, i + 64).map(async (name) => {
         const p = path.posix.join(full, name);
-        if (scope.root === '/' && (p === '/System/Volumes' || p === '/Volumes')) return;
+        if (scope.root === '/' && p === '/Volumes') return;
         try {
           const st = await fs.lstat(p, { bigint: true });
           const kind = st.isDirectory() ? 1 : st.isSymbolicLink() ? 2 : 0;
           if (!kind && !st.isFile()) return;
+          if (kind === 1 && residual && Number(st.dev) === scope.dataDevice && seenData.has(st.ino)) return;
           const child = add(id, depth, kind, name, Number(st.size), Number(st.blocks) * 512,
             Number(st.mtimeMs / 1000n), Number(st.atimeMs / 1000n), Number(st.birthtimeMs / 1000n),
             st.nlink > 1n ? String(st.dev) + ':' + String(st.ino) : undefined);
-          if (kind === 1) pending.push({ id: child, depth: depth + 1, full: p });
+          if (kind === 1) {
+            const entry = { id: child, depth: depth + 1, full: p };
+            if (scope.root === '/' && p === MAC_DATA) data = entry;
+            else pending.push(entry);
+          }
         } catch (e) {
           if ((e as NodeJS.ErrnoException).code !== 'ENOENT') markError(tree, id, stats);
         }

@@ -15,11 +15,16 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
+#include <optional>
+#include <unordered_set>
 #include <string>
 #include <vector>
 
 namespace {
+constexpr char mountsRoot[] = "/System/Volumes";
 constexpr char dataRoot[] = "/System/Volumes/Data";
+constexpr int scanFlags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW_ANY | O_CLOEXEC;
 
 void jsonString(const char* s) {
     std::putchar('"');
@@ -112,6 +117,9 @@ enum class Bulk { done, unsupported, failed };
 
 class Walk {
     std::vector<Folder> pending;
+    std::optional<Folder> residualData;
+    std::unordered_set<ino_t> dataDirs;
+    bool scanningResidual = false;
     uint32_t lastID = 0;
     uint64_t bulkEntries = 0;
     dev_t device = 0;
@@ -129,8 +137,14 @@ class Walk {
         if (e.type != VDIR && e.type != VREG && e.type != VLNK) return;
         if (e.type == VDIR) {
             std::string full = parent.path == "/" ? parent.path + name : parent.path + "/" + name;
-            if (startup && (full == "/System/Volumes" || full == "/Volumes")) return;
-            pending.push_back({lastID + 1, parent.depth + 1, std::move(full)});
+            if (startup && full == "/Volumes") return;
+            if (scanningResidual) {
+                struct stat st {};
+                if (lstat(full.c_str(), &st) == 0 && st.st_dev == dataDevice && dataDirs.count(st.st_ino)) return;
+            }
+            Folder child {lastID + 1, parent.depth + 1, std::move(full)};
+            if (startup && child.path == dataRoot) residualData = std::move(child);
+            else pending.push_back(std::move(child));
         }
         ++lastID;
         // [parent ID, parent depth, kind, name, size, alloc, mtime, atime, birthtime, hard-link identity]
@@ -204,16 +218,25 @@ class Walk {
     }
 
     void directory(const Folder& folder) {
-        if (folder.path == volumeTrash) {
-            // .Trashes can allow traversal of our UID directory without allowing listing.
-            struct stat st {};
-            auto own = folder.path + "/" + uid;
-            if (lstat(own.c_str(), &st) == 0 && S_ISDIR(st.st_mode) && st.st_uid == getuid() && st.st_dev == device) {
-                emit(folder, uid.c_str(), {VDIR, 0, 0, 0, 0, 0, 0, 0}, st.st_dev);
-            } else if (errno != ENOENT) error(folder.id);
+        if (startup && folder.path == mountsRoot) {
+            // Walk the merged view first, then include Data entries with no visible alias.
+            if (includesData) emit(folder, "Data", {VDIR, 0, 0, 0, 0, 0, 0, 0}, dataDevice);
             return;
         }
-        int fd = open(folder.path.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        if (folder.path == volumeTrash) {
+            // .Trashes can allow traversal of our UID directory without allowing listing.
+            const int trash = open(folder.path.c_str(), O_SEARCH | O_NOFOLLOW_ANY | O_CLOEXEC);
+            if (trash < 0) return error(folder.id);
+            struct stat st {};
+            if (fstatat(trash, uid.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0) {
+                if (S_ISDIR(st.st_mode) && st.st_uid == getuid() && st.st_dev == device) {
+                    emit(folder, uid.c_str(), {VDIR, 0, 0, 0, 0, 0, 0, 0}, st.st_dev);
+                }
+            } else if (errno != ENOENT) error(folder.id);
+            close(trash);
+            return;
+        }
+        int fd = open(folder.path.c_str(), scanFlags);
         if (fd < 0) return error(folder.id);
         struct stat st {};
         if (fstat(fd, &st) != 0) {
@@ -224,13 +247,17 @@ class Walk {
             close(fd);
             return;
         }
+        if (includesData && st.st_dev == dataDevice && !dataDirs.insert(st.st_ino).second) {
+            close(fd);
+            return;
+        }
         const auto result = bulk(fd, folder, st.st_dev);
         close(fd);
         if (result == Bulk::done) return;
         if (result == Bulk::failed) return error(folder.id);
 
         // Mixing getattrlistbulk and readdir on one descriptor is undefined.
-        fd = open(folder.path.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        fd = open(folder.path.c_str(), scanFlags);
         if (fd < 0) return error(folder.id);
         struct stat reopened {};
         if (fstat(fd, &reopened) != 0 || reopened.st_dev != st.st_dev || reopened.st_ino != st.st_ino) {
@@ -266,7 +293,12 @@ public:
             includesData = true;
             dataDevice = st.st_dev;
         }
-        while (!pending.empty()) {
+        while (!pending.empty() || residualData) {
+            if (pending.empty()) {
+                pending.push_back(std::move(*residualData));
+                residualData.reset();
+                scanningResidual = true;
+            }
             Folder folder = std::move(pending.back());
             pending.pop_back();
             directory(folder);
@@ -275,9 +307,69 @@ public:
         return std::fflush(stdout) == 0 && !std::ferror(stdout) ? 0 : 1;
     }
 };
+
+bool sameEntry(const struct stat& a, const struct stat& b) {
+    return a.st_dev == b.st_dev && a.st_ino == b.st_ino;
+}
+
+bool removeAt(int parent, const char* name, const struct stat& expected, bool contents) {
+    if (S_ISDIR(expected.st_mode)) {
+        const int fd = openat(parent, name, scanFlags);
+        if (fd < 0) return false;
+        struct stat pinned {};
+        if (fstat(fd, &pinned) != 0 || !sameEntry(pinned, expected)) {
+            close(fd);
+            return false;
+        }
+        DIR* dir = fdopendir(fd);
+        if (!dir) {
+            close(fd);
+            return false;
+        }
+        // Snapshot names before mutating the directory's entries.
+        std::vector<std::string> names;
+        while (true) {
+            errno = 0;
+            const auto* child = readdir(dir);
+            if (!child) break;
+            if (std::strcmp(child->d_name, ".") && std::strcmp(child->d_name, "..")) names.emplace_back(child->d_name);
+        }
+        bool ok = errno == 0;
+        for (const auto& child : names) {
+            struct stat st {};
+            if (fstatat(fd, child.c_str(), &st, AT_SYMLINK_NOFOLLOW) != 0) {
+                if (errno != ENOENT) ok = false;
+                continue;
+            }
+            if (st.st_dev != pinned.st_dev || !removeAt(fd, child.c_str(), st, false)) ok = false;
+        }
+        closedir(dir);
+        if (contents || !ok) return ok;
+    } else if (contents || (!S_ISREG(expected.st_mode) && !S_ISLNK(expected.st_mode))) return false;
+
+    struct stat current {};
+    return fstatat(parent, name, &current, AT_SYMLINK_NOFOLLOW) == 0 &&
+        sameEntry(current, expected) && unlinkat(parent, name, S_ISDIR(expected.st_mode) ? AT_REMOVEDIR : 0) == 0;
+}
+
+int cleanup(const char* mode, const char* parentPath, const char* name, const char* device, const char* inode) {
+    const bool contents = std::strcmp(mode, "contents") == 0;
+    if ((!contents && std::strcmp(mode, "permanent")) || !*name || std::strchr(name, '/') ||
+        !std::strcmp(name, ".") || !std::strcmp(name, "..")) return 2;
+
+    const int parent = open(parentPath, O_SEARCH | O_NOFOLLOW_ANY | O_CLOEXEC);
+    if (parent < 0) return 1;
+    struct stat st {}, parentStat {};
+    const bool ok = fstat(parent, &parentStat) == 0 && fstatat(parent, name, &st, AT_SYMLINK_NOFOLLOW) == 0 &&
+        st.st_dev == parentStat.st_dev && st.st_dev == static_cast<dev_t>(std::strtoll(device, nullptr, 10)) &&
+        st.st_ino == std::strtoull(inode, nullptr, 10) && removeAt(parent, name, st, contents);
+    close(parent);
+    return ok ? 0 : 1;
+}
 }
 
 int main(int argc, char** argv) {
+    if (argc == 7 && std::strcmp(argv[1], "--remove") == 0) return cleanup(argv[2], argv[3], argv[4], argv[5], argv[6]);
     if (argc == 2 && std::strcmp(argv[1], "--volumes") == 0) return volumes();
     if (argc != 3) return 2;
     std::setvbuf(stdout, nullptr, _IOFBF, 64 * 1024);

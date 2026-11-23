@@ -163,7 +163,6 @@ function macDirContext(parentCtx: number, name: string, depth: number, parentNam
   }
   let ctx = parentCtx;
   if (depth === 2 && parentName === 'users') return ctx | CTX_PROFILE;
-  if (depth === 2 && ctx & CTX_PROFILE && name === '.trash') return withCat(ctx, Cat.trash);
   if (name === '.trash' && ctx & CTX_PROFILE) return withCat(ctx, Cat.trash);
   if (name === 'downloads') ctx |= CTX_DL;
   if (name === 'caches' && parentName === 'library' && ctx & CTX_PROFILE) return withCat(ctx, Cat.caches);

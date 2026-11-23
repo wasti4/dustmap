@@ -233,25 +233,27 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
             </span>
             <Button small onClick={() => void api.openDiskAccessSettings()}>{t('mac.diskAccess.open')}</Button>
           </div>
-        ) : <>
-        <div className="set-row">
-          <span>
-            <Zap size={14} aria-hidden /> {t('set.turbo')}
-            <small className="muted">{t('set.turboHint')}</small>
-          </span>
-          <Switch checked={prefs.turbo} onChange={(v) => setPrefs({ turbo: v })} label={t('set.turbo')} />
-        </div>
-        <div className="set-row set-admin">
-          <span>
-            <ShieldCheck size={14} aria-hidden /> {elevated ? t('set.admin') : t('set.user')}
-          </span>
-          {!elevated && (
-            <Button small icon={Zap} onClick={() => void elevate()}>
-              {t('turbo.enable')}
-            </Button>
-          )}
-        </div>
-        </>}
+        ) : (
+          <>
+            <div className="set-row">
+              <span>
+                <Zap size={14} aria-hidden /> {t('set.turbo')}
+                <small className="muted">{t('set.turboHint')}</small>
+              </span>
+              <Switch checked={prefs.turbo} onChange={(v) => setPrefs({ turbo: v })} label={t('set.turbo')} />
+            </div>
+            <div className="set-row set-admin">
+              <span>
+                <ShieldCheck size={14} aria-hidden /> {elevated ? t('set.admin') : t('set.user')}
+              </span>
+              {!elevated && (
+                <Button small icon={Zap} onClick={() => void elevate()}>
+                  {t('turbo.enable')}
+                </Button>
+              )}
+            </div>
+          </>
+        )}
         <p className="muted small">{t('set.about', { v: startup?.version ?? '' })}</p>
       </div>
     </Modal>

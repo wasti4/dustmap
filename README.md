@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>See what fills your disk, find what’s gathering dust, and clean up safely.</b><br>
-  A fast, open-source disk space analyzer for Windows.
+  A fast, open-source disk space analyzer for Windows and macOS.
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><b>Download for Windows</b></a> ·
+  <a href="../../releases/latest"><b>Download Dustmap</b></a> ·
   <a href="README.ru.md">Русский</a> ·
   <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="CHANGELOG.md">Changelog</a>
@@ -30,9 +30,9 @@ https://github.com/user-attachments/assets/4b7f5ba1-2586-428c-8a0b-e1f1628578ff
 
 ## Why Dustmap
 
-- **A whole drive in seconds.** About 7 seconds for a system drive with no admin rights, 3.4 seconds in turbo mode.
+- **Fast disk scans.** About 7 seconds for the benchmarked Windows system drive, or 3.4 seconds in NTFS turbo mode. macOS reads file metadata in bulk on APFS.
 - **Finds what you forgot.** Large files and whole folders nobody has opened for months, sorted by size.
-- **Cleans up safely.** Everything goes to the Recycle Bin, Windows folders are protected, and you see the total before you confirm.
+- **Cleans up safely.** The Recycle Bin or Trash is the default destination. System folders are protected, and you see the selected size before you confirm.
 
 ## Screenshots
 
@@ -45,15 +45,15 @@ https://github.com/user-attachments/assets/4b7f5ba1-2586-428c-8a0b-e1f1628578ff
 
 ## Features
 
-- **Fast scans.** A native helper reads directories in bulk with `NtQueryDirectoryFile`, so sizes, on-disk sizes and timestamps arrive without a separate `stat` per file. A full system drive with 1.1 million entries takes about 6–8 seconds, no administrator rights needed.
+- **Fast scans.** Native helpers read directory metadata in bulk through `NtQueryDirectoryFile` on Windows and `getattrlistbulk` on macOS. You can scan a drive or a specific folder.
 - **Turbo mode (NTFS MFT).** Run as administrator and Dustmap reads the NTFS Master File Table directly in one sequential pass. It sees protected folders and counts hard links once, so the total matches the drive’s used space.
 - **Storage widget.** A dot-matrix bar split into twelve categories fills up live while scanning, explains each category on hover and dissolves into particles when you free space.
-- **Smart categories.** Folders give context first (Windows, Program Files, AppData, browser caches, `node_modules`, Steam libraries, game data), file extensions second.
+- **Smart categories.** Folders give context first (system directories, apps, user caches, `node_modules`, Steam libraries and game data), file extensions second.
 - **Cleanup suggestions.** Recycle Bin, app caches, temporary files, dependencies and build output of inactive projects (`node_modules`, `target`, `bin/obj`…), old installers and downloads, large files unused for a year, `Windows.old`, the hibernation file.
 - **Forgotten files.** Filter by last use (3 months to 3 years), size and category. Smart groups show whole forgotten folders instead of thousands of single files.
 - **Explorer and treemap.** A folder tree sorted by size, with shares and last-used dates, next to a squarified treemap. Selection is shared between them.
 - **Largest files, file types and search.** `*.mp4` searches by extension.
-- **Safe by default.** Deleted items go to the Recycle Bin unless you choose otherwise, every action shows its total size before you confirm, Windows and key folders are protected in the main process, and cache cleanup removes contents only while skipping files in use.
+- **Safe by default.** Each cleanup shows its selection before you confirm. The main process protects system paths, and cache cleanup keeps the cache directory in place. On macOS, close the affected apps before clearing their caches.
 - **Languages and themes.** English, Russian, Chinese and Spanish; dark and light themes with an animated switch. Both follow the system by default.
 - **Accessible.** Full keyboard control, ARIA roles, screen reader announcements and a reduced-motion mode.
 - **Private.** Works offline. No accounts, no telemetry.
@@ -66,9 +66,18 @@ Get the latest build from [Releases](../../releases/latest):
 - `Dustmap-Setup-x.y.z.exe`: installer with a Start menu shortcut
 - `Dustmap-x.y.z-portable.exe`: a single file, no installation
 
-Requirements: Windows 10 or 11, 64-bit.
+- `Dustmap-x.y.z-mac-arm64.dmg` for Apple Silicon
+- `Dustmap-x.y.z-mac-x64.dmg` for Intel
 
-The builds aren’t code-signed yet, so Windows SmartScreen may warn on the first launch. Choose **More info → Run anyway**. For turbo mode, start Dustmap as administrator or use **Restart as administrator** inside the app.
+Dustmap requires 64-bit Windows 10 or 11, or macOS 13 Ventura or later. On Mac, open the disk image and drag Dustmap to Applications. Test images from GitHub Actions are ad-hoc signed and may require approval in Privacy & Security. Developer ID-signed and notarized images can be distributed normally.
+
+Windows SmartScreen may warn about the current Windows builds. For NTFS turbo mode, start Dustmap as administrator or choose **Restart as administrator** in the app.
+
+### macOS disk access and sizes
+
+Start by scanning a folder or drive. To include folders protected by macOS, grant Dustmap **Full Disk Access** in **System Settings → Privacy & Security** and reopen it. Dustmap reports entries it cannot read.
+
+The startup scan includes the System and Data volumes and skips other mounted volumes, which are available separately. The capacity bar shows space outside the scan separately. APFS clones, snapshots and shared container space can make the space you recover differ from the sizes shown next to files. Emptying Trash applies to your Trash on the selected drive.
 
 ## Performance
 
@@ -86,17 +95,17 @@ Dustmap tries to stay out of your way:
 - Hardware acceleration is off, since the interface is plain 2D. That saves about 300 MB of memory.
 - Animations only run while something changes. The bar’s ambient twinkle stops after 15 seconds without input, so an idle window uses no CPU.
 - The file index lives in its own process and is released completely when you return to the start screen.
-- Drives are listed by the native helper instead of PowerShell.
+- Drive discovery uses the platform’s native helper when available.
 - The package ships only the Chromium language packs it needs and uses maximum compression.
 
 After scanning a profile with 680 thousand entries, all processes together use about 490 MB of private memory, about 300 MB of it for the file index. The installer is 108 MB and the portable build 98 MB; most of that is the Chromium runtime inside Electron.
 
 ## Build from source
 
-You need Windows 10 or 11 and Node.js 22 or newer.
+Use Node.js 24 with Windows 10 or 11, or macOS 13 or later. Xcode Command Line Tools provide the compiler for native scanning and cleanup on Mac.
 
-```powershell
-npm install
+```sh
+npm ci
 npm start
 ```
 
@@ -105,15 +114,17 @@ npm start
 | `npm start` | build and launch the app |
 | `npm run dev` | development mode: Vite with hot reload plus Electron |
 | `npm run typecheck` | TypeScript type check |
-| `npm test` | self-test and benchmark of the MFT parser on a synthetic table (no admin needed) |
-| `npm run bench -- C:\ [--mft]` | scan benchmark in the console (`--mft` needs an administrator terminal) |
-| `npm run dist` | build the installer and the portable exe with electron-builder |
+| `npm test` | MFT parser self-test and macOS scanner and cleanup regression checks |
+| `npm run bench -- C:\ [--mft]` or `npm run bench -- /Users/me` | scan benchmark in the console (`--mft` needs an administrator terminal) |
+| `npm run dist` | build Windows executables on Windows and a disk image for the current architecture on macOS |
 
 `npm start -- --demo` opens the app with a synthetic drive, which is handy for trying cleanup flows without touching real files. Add `--theme=light` or `--lang=es` to force a theme or language. The UI also runs in a plain browser: after `npm run dev`, open the Vite URL with `?scan=C:\` and a demo backend kicks in.
 
 If Electron’s binary is missing after `npm install` (`node_modules/electron/dist` is empty), run `node node_modules/electron/install.js`.
 
-The native helper is compiled during the build with the C# compiler that ships with Windows (`%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe`), so no SDK is required. Without it, Dustmap falls back to a portable Node.js walker.
+The Windows build uses the C# compiler that ships with Windows. The macOS build uses Xcode's `clang++`. When the helper is unavailable in a development build, the app can still scan using Node.js. Permanent cleanup on macOS uses the bundled native helper.
+
+On a Mac without a Developer ID certificate, `npm run dist -- --publish never -c.mac.identity=-` makes an ad-hoc-signed test disk image. See [release signing](CONTRIBUTING.md#macos-release-signing) for distributable images.
 
 ## How it works
 
@@ -128,7 +139,9 @@ src/
     classify.ts  categories from folder context and file extensions
     query.ts     children, treemap, largest and forgotten files, cleanup insights
   native/
-    sc-walker.cs multi-threaded directory enumerator and drive lister
+    sc-walker.cs Windows directory enumerator and drive lister
+    mac-walker.cc macOS metadata scanner, volume lister and cleanup helper
+  platform/    macOS volume discovery and protected cleanup paths
   renderer/    React UI: widget, explorer, treemap, lists, dialogs
     lib/locales/ translations
   shared/      types shared by all processes

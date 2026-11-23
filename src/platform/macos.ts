@@ -7,7 +7,8 @@ import { promisify } from 'node:util';
 import type { DriveInfo } from '../shared/types';
 
 const exec = promisify(execFile);
-export const MAC_DATA = '/System/Volumes/Data';
+export const MAC_MOUNTS = '/System/Volumes';
+export const MAC_DATA = MAC_MOUNTS + '/Data';
 export const isMac = process.platform === 'darwin';
 
 export function macHelperPath(): string | undefined {
@@ -72,7 +73,7 @@ async function readMacMounts(): Promise<Mount[]> {
 }
 
 function visibleMount(m: Mount): boolean {
-  return m.root === '/' || m.root.startsWith('/Volumes/') || m.root.startsWith('/Network/Servers/');
+  return m.root === '/' || /^\/Volumes\/[^./][^/]*$/.test(m.root) || m.root.startsWith('/Network/Servers/');
 }
 
 export async function macDrives(): Promise<DriveInfo[]> {
@@ -92,6 +93,7 @@ export interface MacScanScope {
   root: string;
   volume: string;
   devices: Set<number>;
+  dataDevice?: number;
   trashPath: string;
   cacheRoots: string[];
 }
@@ -111,14 +113,12 @@ export async function macScanScope(requested: string): Promise<MacScanScope> {
   const mounts = await readMacMounts();
   const volume = scanMount(root, mounts.map((m) => m.root));
   const devices = new Set([root === '/' ? (await fs.promises.stat(root)).dev : st.dev]);
-  if (root === '/') {
-    const data = await fs.promises.stat(MAC_DATA).catch(() => undefined);
-    if (data) devices.add(data.dev);
-  }
+  const dataDevice = root === '/' ? (await fs.promises.stat(MAC_DATA).catch(() => undefined))?.dev : undefined;
+  if (dataDevice !== undefined) devices.add(dataDevice);
   const home = os.homedir();
   const temp = await fs.promises.realpath(os.tmpdir()).catch(() => os.tmpdir());
   return {
-    root, volume, devices, trashPath: macTrashPath(volume, home),
+    root, volume, devices, dataDevice, trashPath: macTrashPath(volume, home),
     cacheRoots: [path.posix.join(home, 'Library', 'Caches'), path.posix.join(home, '.cache'), temp],
   };
 }

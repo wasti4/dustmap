@@ -45,6 +45,17 @@ jobs:
         if: runner.os == 'macOS'
         name: Test macOS without the native helper
 
+      - name: Test the startup disk and a case-sensitive APFS volume
+        if: matrix.artifact == 'dustmap-macos-arm64'
+        shell: bash
+        run: |
+          image="$RUNNER_TEMP/dustmap-fixture.dmg"
+          volume="/Volumes/Dustmap Fixture"
+          hdiutil create -quiet -size 96m -fs APFSX -volname 'Dustmap Fixture' "$image"
+          hdiutil attach -quiet -owners on -nobrowse "$image"
+          trap 'hdiutil detach "$volume"' EXIT
+          DUSTMAP_TEST_STARTUP=1 DUSTMAP_TEST_VOLUME="$volume" node dist-electron/cli.cjs --selftest
+
       - name: Package Windows
         if: runner.os == 'Windows'
         run: npm run dist -- --publish never
@@ -52,6 +63,9 @@ jobs:
       - name: Package macOS
         if: runner.os == 'macOS'
         run: npm run dist -- --publish never -c.mac.identity=-
+        env:
+          # PR builds use a local ad-hoc identity and receive no signing credentials.
+          CSC_FOR_PULL_REQUEST: 'true'
 
       - name: Mount and smoke-test the macOS installer
         if: runner.os == 'macOS'

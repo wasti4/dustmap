@@ -393,8 +393,8 @@ function registerIpc() {
 
   ipcMain.handle('emptyRecycleBin', async (_e, root: string): Promise<OpResult> => {
     if (isMac) return macOperations([root], async () => {
-      const { trashPath } = await macScanScope(root);
-      await emptyMacTrash(trashPath);
+      const { trashPath, volume } = await macScanScope(root);
+      await emptyMacTrash(trashPath, volume === '/' ? os.homedir() : volume);
     });
     const letter = /^[a-z]/i.exec(root)?.[0]?.toUpperCase() ?? systemDrive[0];
     try {
