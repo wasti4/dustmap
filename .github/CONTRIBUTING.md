@@ -59,4 +59,4 @@ The scenario sets camera cues (`overview`, `follow`, `focus`), and critically da
 
 ## Project layout
 
-See “How it works” in the [README](README.md#how-it-works).
+See “How it works” in the [README](../README.md#how-it-works).

@@ -14,7 +14,7 @@ const t = Date.now();
 await build(nodeBundles({ engineOnly }));
 console.log(`[build] node bundles ready in ${Date.now() - t} ms`);
 buildHelper();
-if (existsSync('build/icon.png')) copyFileSync('build/icon.png', 'dist-electron/icon.png');
+if (existsSync('assets/icon.png')) copyFileSync('assets/icon.png', 'dist-electron/icon.png');
 if (!engineOnly) {
   await viteBuild({ configFile: 'vite.config.mjs', logLevel: 'warn' });
   console.log('[build] renderer ready');

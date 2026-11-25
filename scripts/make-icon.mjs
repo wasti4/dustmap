@@ -1,4 +1,4 @@
-// Generates build/icon.png (512x512): the Dustmap mark, a disk platter made of
+// Generates assets/icon.png (512x512): the Dustmap mark, a disk platter made of
 // dots with the used sector lit up, on a dark rounded tile. Same geometry as
 // src/renderer/lib/logo.ts. No image libraries needed: shapes are rasterised
 // with 4x4 supersampling and encoded as PNG with zlib.
@@ -95,5 +95,5 @@ const png = Buffer.concat([
   chunk('IEND', Buffer.alloc(0)),
 ]);
 mkdirSync('build', { recursive: true });
-writeFileSync('build/icon.png', png);
-console.log(`build/icon.png written (${png.length} bytes)`);
+writeFileSync('assets/icon.png', png);
+console.log(`assets/icon.png written (${png.length} bytes)`);

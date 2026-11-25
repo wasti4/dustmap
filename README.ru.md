@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="branding/dustmap.svg" width="96" alt="Логотип Dustmap">
+  <img src="assets/logo.svg" width="96" alt="Логотип Dustmap">
 </p>
 
 <h1 align="center">Dustmap</h1>
@@ -20,7 +20,7 @@
 <p align="center">
   <a href="../../releases/latest"><b>Скачать для Windows</b></a> ·
   <a href="README.md">English</a> ·
-  <a href="CONTRIBUTING.md">Как помочь проекту</a> ·
+  <a href=".github/CONTRIBUTING.md">Как помочь проекту</a> ·
   <a href="CHANGELOG.md">Изменения</a>
 </p>
 
@@ -38,8 +38,8 @@ https://github.com/user-attachments/assets/4b7f5ba1-2586-428c-8a0b-e1f1628578ff
 
 <table>
   <tr>
-    <td><img src="docs/screenshots/overview-dark.png" alt="Dustmap в тёмной теме"></td>
-    <td><img src="docs/screenshots/overview-light.png" alt="Dustmap в светлой теме"></td>
+    <td><img src="assets/screenshots/overview-dark.png" alt="Dustmap в тёмной теме"></td>
+    <td><img src="assets/screenshots/overview-light.png" alt="Dustmap в светлой теме"></td>
   </tr>
 </table>
 
